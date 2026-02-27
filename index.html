@@ -24,7 +24,7 @@ canvas#main{display:block;width:100vw;height:100vh}
 #throttle-fill{position:absolute;bottom:0;width:100%;background:linear-gradient(to top,#00ff88,#00cc66);border-radius:2px;transition:height 0.1s}
 #throttle-label{color:#00ff8899;font-size:10px;text-align:center;margin-top:4px;letter-spacing:2px}
 #horizon-container{position:absolute;left:50%;bottom:30px;transform:translateX(-50%)}
-#horizon-canvas{border:2px solid #00ff8844;border-radius:50%;background:rgba(0,20,10,0.4)}
+#horizon-canvas{border:3px solid #00ff88aa;border-radius:50%;background:rgba(0,20,10,0.5);box-shadow:0 0 12px #00ff8844}
 #instructions{position:fixed;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;z-index:100;background:rgba(0,0,0,0.7);transition:opacity 1s}
 #instructions.hidden{opacity:0;pointer-events:none}
 #instructions-box{background:rgba(0,20,10,0.9);border:1px solid #00ff8866;border-radius:12px;padding:40px;max-width:520px;color:#00ff88;text-align:center}
@@ -91,7 +91,7 @@ canvas#main{display:block;width:100vw;height:100vh}
     <div id="throttle-label" class="hud-text">THR</div>
   </div>
   <div id="horizon-container">
-    <canvas id="horizon-canvas" width="120" height="120"></canvas>
+    <canvas id="horizon-canvas" width="180" height="180"></canvas>
   </div>
   <div id="instrument-panel">
     <canvas id="instrument-canvas" width="660" height="160"></canvas>
@@ -1021,8 +1021,8 @@ class CockpitRenderer {
     return new THREE.Line(geo, new THREE.LineBasicMaterial({ color }));
   }
   buildBiplane(mat) {
-    const wood = mat(0x8B6914);
-    const darkWood = mat(0x5C4410);
+    const wood = mat(0xaa1111);
+    const darkWood = mat(0x881111);
     const metal = mat(0x888888, { metalness: 0.6 });
     const leather = mat(0x553311);
     const darkMetal = mat(0x333333, { metalness: 0.7 });
@@ -1074,6 +1074,19 @@ class CockpitRenderer {
     const scrTop = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.015, 0.015), screenFrame);
     scrTop.position.set(0, -0.1, -0.9);
     this.add(scrTop);
+    // Gun sight ring (WWI style — thin torus in front of windscreen)
+    const sightRing = new THREE.Mesh(
+      new THREE.TorusGeometry(0.08, 0.003, 8, 24),
+      mat(0xbbbbbb, { metalness: 0.6 })
+    );
+    sightRing.position.set(0, -0.05, -0.95);
+    this.add(sightRing);
+    // Gun sight crosshairs
+    for (let a = 0; a < 4; a++) {
+      const cross = new THREE.Mesh(new THREE.BoxGeometry(a % 2 === 0 ? 0.002 : 0.16, a % 2 === 0 ? 0.16 : 0.002, 0.002), mat(0xbbbbbb, { metalness: 0.6 }));
+      cross.position.set(0, -0.05, -0.95);
+      this.add(cross);
+    }
     // Upper wing (high overhead, thin)
     const wing = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.04, 0.6), wood);
     wing.position.set(0, 0.9, -0.3);
@@ -1111,7 +1124,7 @@ class CockpitRenderer {
         tick.position.set(x + Math.cos(a)*0.042, y + Math.sin(a)*0.042, -0.917);
         this.add(tick);
       }
-      const needle = this.makeNeedle(0.042, 0xff4400);
+      const needle = this.makeNeedle(0.048, 0xff4400);
       needle.position.set(x, y, -0.916);
       needle.name = 'needle_' + instLabels[i];
       this.add(needle);
@@ -1184,6 +1197,29 @@ class CockpitRenderer {
     const glareshield = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.015, 0.08), mat(0x111111));
     glareshield.position.set(0, -0.35, -1.04);
     this.add(glareshield);
+    // Compass ball (mounted on top of dash — classic Cessna wet compass)
+    const compassBase = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.04, 0.06), mat(0x222222));
+    compassBase.position.set(0, -0.33, -1.05);
+    this.add(compassBase);
+    const compassBall = new THREE.Mesh(
+      new THREE.SphereGeometry(0.03, 10, 8),
+      mat(0xeeeedd, { metalness: 0.2 })
+    );
+    compassBall.position.set(0, -0.3, -1.05);
+    this.add(compassBall);
+    const compassRim = new THREE.Mesh(
+      new THREE.RingGeometry(0.025, 0.032, 12),
+      mat(0xaaaaaa, { metalness: 0.5 })
+    );
+    compassRim.position.set(0, -0.3, -1.02);
+    this.add(compassRim);
+    // Trim indicator (right of center, on dash face)
+    const trimBase = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.08, 0.01), mat(0x0a0a0a));
+    trimBase.position.set(0.45, -0.52, -1.055);
+    this.add(trimBase);
+    const trimPointer = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.006, 0.005), mat(0x00ff44));
+    trimPointer.position.set(0.45, -0.52, -1.05);
+    this.add(trimPointer);
     // Six-pack instruments — compact, tucked into lower dash
     const instNames = [['SPD','ALT','HDG'],['VSI','TURN','RPM']];
     for (let r = 0; r < 2; r++) {
@@ -1219,7 +1255,7 @@ class CockpitRenderer {
         const pivot = new THREE.Mesh(new THREE.CircleGeometry(0.005, 8), mat(0xffffff));
         pivot.position.set(x, y, -1.051);
         this.add(pivot);
-        const needle = this.makeNeedle(0.043, 0xff3300);
+        const needle = this.makeNeedle(0.048, 0xff4400);
         needle.position.set(x, y, -1.05);
         needle.name = 'needle_' + instNames[r][c];
         this.add(needle);
@@ -1765,8 +1801,8 @@ class AircraftModels {
   buildBiplane() {
     const group = new THREE.Group();
     const mat = (color, opts={}) => new THREE.MeshStandardMaterial({ color, roughness: 0.7, ...opts });
-    const body = mat(0xf5e6c8);
-    const accent = mat(0xcc3333);
+    const body = mat(0xcc1111);
+    const accent = mat(0xdd2222);
     const metal = mat(0x777777, { metalness: 0.6 });
     const dark = mat(0x443322);
     // Fuselage — tapered box shape
@@ -1862,7 +1898,7 @@ class AircraftModels {
     const group = new THREE.Group();
     const mat = (color, opts={}) => new THREE.MeshStandardMaterial({ color, roughness: 0.55, ...opts });
     const white = mat(0xeeeeee);
-    const blue = mat(0x1144aa);
+    const blue = mat(0x1166dd);
     const metal = mat(0x888888, { metalness: 0.5 });
     const glass = mat(0xaaddff, { transparent: true, opacity: 0.25 });
     // Fuselage — rounded
@@ -1982,6 +2018,13 @@ class AircraftModels {
     fuseTail.rotation.x = Math.PI/2;
     fuseTail.position.z = 2;
     group.add(fuseTail);
+    // Orange competition stripe on fuselage
+    const orange = mat(0xff6600);
+    const fuseStripe = new THREE.Mesh(new THREE.CylinderGeometry(0.37, 0.42, 2.5, 8), orange);
+    fuseStripe.rotation.x = Math.PI/2;
+    fuseStripe.position.set(0, 0.02, -0.8);
+    fuseStripe.scale.set(1, 1, 0.12);
+    group.add(fuseStripe);
     // Bubble canopy
     const canopy = new THREE.Mesh(
       new THREE.SphereGeometry(0.45, 10, 8, 0, Math.PI*2, 0, Math.PI*0.55),
@@ -1997,8 +2040,12 @@ class AircraftModels {
       const wingOuter = new THREE.Mesh(new THREE.BoxGeometry(5, 0.08, 0.9), white);
       wingOuter.position.set(s * 7.5, 0.25, -0.3);
       group.add(wingOuter);
+      // Orange wing tip accent
+      const tipAccent = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.1, 0.9), orange);
+      tipAccent.position.set(s * 9.5, 0.25, -0.3);
+      group.add(tipAccent);
       // Winglet
-      const winglet = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.6, 0.5), white);
+      const winglet = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.6, 0.5), orange);
       winglet.position.set(s * 10, 0.5, -0.3);
       group.add(winglet);
     }
@@ -2170,7 +2217,7 @@ class AirstripSystem {
     this.scene = scene;
     this.noise = noise;
     this.strips = new Map();
-    this.gridSpacing = 3000;
+    this.gridSpacing = 1500;
     this.spawnStripPlaced = false;
   }
   clearAll() {
@@ -2276,17 +2323,17 @@ class AirstripSystem {
     group.add(hangarDoor);
     // Control tower
     const towerMat = new THREE.MeshStandardMaterial({ color: 0xddddcc, roughness: 0.7 });
-    const towerBase = new THREE.Mesh(new THREE.BoxGeometry(4, 10, 4), towerMat);
-    towerBase.position.set(sx - 50, h + 5, sz + 28);
+    const towerBase = new THREE.Mesh(new THREE.BoxGeometry(4, 16, 4), towerMat);
+    towerBase.position.set(sx - 50, h + 8, sz + 28);
     group.add(towerBase);
     const towerCab = new THREE.Mesh(new THREE.BoxGeometry(6, 3, 6), new THREE.MeshStandardMaterial({ color: 0x446644 }));
-    towerCab.position.set(sx - 50, h + 11.5, sz + 28);
+    towerCab.position.set(sx - 50, h + 17.5, sz + 28);
     group.add(towerCab);
     const towerGlass = new THREE.Mesh(
       new THREE.BoxGeometry(5.5, 2, 5.5),
       new THREE.MeshStandardMaterial({ color: 0x88bbdd, transparent: true, opacity: 0.4, metalness: 0.3 })
     );
-    towerGlass.position.set(sx - 50, h + 11.5, sz + 28);
+    towerGlass.position.set(sx - 50, h + 17.5, sz + 28);
     group.add(towerGlass);
     // Parking area with lines
     for (let i = 0; i < 3; i++) {
@@ -2303,6 +2350,30 @@ class AirstripSystem {
         );
         light.position.set(sx + i * 10, h + 0.5, sz + side * 11.5);
         group.add(light);
+      }
+    }
+    // Airport beacon — 25m tall pylon with bright green emissive sphere
+    const beaconPoleMat = new THREE.MeshStandardMaterial({ color: 0x666666, metalness: 0.4 });
+    const beaconPole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.2, 25, 6), beaconPoleMat);
+    beaconPole.position.set(sx - 50, h + 12.5, sz + 40);
+    group.add(beaconPole);
+    const beaconLight = new THREE.Mesh(
+      new THREE.SphereGeometry(2, 10, 8),
+      new THREE.MeshStandardMaterial({ color: 0x00ff44, emissive: 0x00ff44, emissiveIntensity: 2.0 })
+    );
+    beaconLight.position.set(sx - 50, h + 25, sz + 40);
+    group.add(beaconLight);
+    // Approach lights — row of 5 bright lights extending 50m from each runway threshold
+    const approachLightMat = new THREE.MeshStandardMaterial({ color: 0xffffaa, emissive: 0xffdd66, emissiveIntensity: 1.5 });
+    for (let side = -1; side <= 1; side += 2) {
+      for (let i = 1; i <= 5; i++) {
+        const appLight = new THREE.Mesh(new THREE.SphereGeometry(0.4, 6, 4), approachLightMat);
+        appLight.position.set(sx + side * (110 + i * 10), h + 1.5, sz);
+        group.add(appLight);
+        // Light pole
+        const appPole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.5, 4), beaconPoleMat);
+        appPole.position.set(sx + side * (110 + i * 10), h + 0.75, sz);
+        group.add(appPole);
       }
     }
   }
@@ -2345,7 +2416,7 @@ class AirstripSystem {
     const sx = gx + offX, sz = gz + offZ;
     const h = terrain.getHeight(sx, sz);
     const wl = terrain.loc.waterLevel || -100;
-    if (h < wl + 3 || h > 250) return;
+    if (h < wl + 3 || h > 500) return;
     const group = new THREE.Group();
     this.buildAirstrip(group, sx, sz, h);
     this.scene.add(group);
@@ -2799,50 +2870,111 @@ class HUDManager {
   }
   drawHorizon(pitch, roll) {
     const ctx = this.horizonCtx;
-    const w = 120, h = 120, cx = w/2, cy = h/2;
+    const w = 180, h = 180, cx = w/2, cy = h/2;
+    const R = 84;
     ctx.clearRect(0, 0, w, h);
+    // Bank angle marks around rim (drawn before clipping)
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.strokeStyle = '#00ff88cc';
+    ctx.fillStyle = '#00ff88cc';
+    const bankAngles = [10, 20, 30, 60, 90];
+    for (const deg of bankAngles) {
+      for (const sign of [-1, 1]) {
+        const a = (-Math.PI/2) + sign * deg * Math.PI / 180;
+        const isMajor = (deg === 30 || deg === 60 || deg === 90);
+        const innerR = isMajor ? R - 10 : R - 6;
+        ctx.lineWidth = isMajor ? 2 : 1;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * innerR, Math.sin(a) * innerR);
+        ctx.lineTo(Math.cos(a) * (R + 1), Math.sin(a) * (R + 1));
+        ctx.stroke();
+      }
+    }
+    // Triangle pointer at top (current roll reference)
+    ctx.beginPath();
+    ctx.moveTo(0, -R + 2);
+    ctx.lineTo(-5, -R + 10);
+    ctx.lineTo(5, -R + 10);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    // Clipped horizon ball
     ctx.save();
     ctx.beginPath();
-    ctx.arc(cx, cy, 56, 0, Math.PI * 2);
+    ctx.arc(cx, cy, R - 2, 0, Math.PI * 2);
     ctx.clip();
     ctx.translate(cx, cy);
     ctx.rotate(-roll);
-    const pitchOffset = pitch * 80;
+    const pitchOffset = pitch * 120;
     ctx.fillStyle = '#2244aa';
-    ctx.fillRect(-60, -60, 120, 60 + pitchOffset);
+    ctx.fillRect(-90, -90, 180, 90 + pitchOffset);
     ctx.fillStyle = '#665533';
-    ctx.fillRect(-60, pitchOffset, 120, 60 - pitchOffset);
+    ctx.fillRect(-90, pitchOffset, 180, 90 - pitchOffset);
+    // Horizon line
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(-60, pitchOffset);
-    ctx.lineTo(60, pitchOffset);
+    ctx.moveTo(-90, pitchOffset);
+    ctx.lineTo(90, pitchOffset);
     ctx.stroke();
-    ctx.strokeStyle = '#ffffff88';
-    ctx.lineWidth = 0.5;
-    for (let d = -20; d <= 20; d += 10) {
+    // Pitch marks
+    ctx.strokeStyle = '#ffffffaa';
+    ctx.lineWidth = 1;
+    for (let d = -30; d <= 30; d += 10) {
       if (d === 0) continue;
-      const y = pitchOffset - d * 2;
+      const y = pitchOffset - d * 3;
+      const halfLen = Math.abs(d) % 20 === 0 ? 22 : 12;
       ctx.beginPath();
-      ctx.moveTo(-15, y);
-      ctx.lineTo(15, y);
+      ctx.moveTo(-halfLen, y);
+      ctx.lineTo(halfLen, y);
       ctx.stroke();
+      // Degree labels
+      if (Math.abs(d) % 20 === 0) {
+        ctx.fillStyle = '#ffffffaa';
+        ctx.font = '9px monospace';
+        ctx.textAlign = 'right';
+        ctx.fillText(Math.abs(d).toString(), -halfLen - 3, y + 3);
+        ctx.textAlign = 'left';
+        ctx.fillText(Math.abs(d).toString(), halfLen + 3, y + 3);
+      }
     }
     ctx.restore();
-    ctx.strokeStyle = '#00ff88';
-    ctx.lineWidth = 2;
+    // Miniature airplane symbol (fixed reference at center)
+    ctx.strokeStyle = '#ffaa00';
+    ctx.fillStyle = '#ffaa00';
+    ctx.lineWidth = 2.5;
+    // Left wing
     ctx.beginPath();
-    ctx.moveTo(cx - 20, cy);
-    ctx.lineTo(cx - 8, cy);
-    ctx.moveTo(cx + 8, cy);
-    ctx.lineTo(cx + 20, cy);
-    ctx.moveTo(cx, cy - 2);
-    ctx.lineTo(cx, cy + 6);
+    ctx.moveTo(cx - 32, cy);
+    ctx.lineTo(cx - 10, cy);
     ctx.stroke();
-    ctx.strokeStyle = '#00ff8844';
-    ctx.lineWidth = 2;
+    // Right wing
     ctx.beginPath();
-    ctx.arc(cx, cy, 57, 0, Math.PI * 2);
+    ctx.moveTo(cx + 10, cy);
+    ctx.lineTo(cx + 32, cy);
+    ctx.stroke();
+    // Wing tips (down ticks)
+    ctx.beginPath();
+    ctx.moveTo(cx - 32, cy);
+    ctx.lineTo(cx - 32, cy + 6);
+    ctx.moveTo(cx + 32, cy);
+    ctx.lineTo(cx + 32, cy + 6);
+    ctx.stroke();
+    // Center dot
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+    ctx.fill();
+    // Tail
+    ctx.beginPath();
+    ctx.moveTo(cx, cy + 4);
+    ctx.lineTo(cx, cy + 12);
+    ctx.stroke();
+    // Outer ring — bright green border
+    ctx.strokeStyle = '#00ff88aa';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
     ctx.stroke();
   }
 }
