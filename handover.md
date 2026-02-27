@@ -1,33 +1,40 @@
-# InfiniteFlight Handover — Feb 26, 2026
+# InfiniteFlight Handover — Feb 27, 2026
 
 ## Current State
-All changes committed and building. File opened in browser for visual testing.
+All changes committed, syntax-checked, and pushed to GitHub.
 
 ## What Was Done (this session)
-1. **Red Biplane** — Body changed from beige to bright red `0xcc1111` (chase view + cockpit panels)
-2. **Colorful Aircraft** — Cessna blue stripe brightened to `0x1166dd`, glider got orange competition stripe + orange wing tips/winglets
-3. **Biplane Cockpit** — Wood panels → red fabric (`0xaa1111`/`0x881111`), added WWI-style gun sight ring with crosshairs
-4. **Cessna Cockpit** — Added compass ball on dash top, trim indicator, longer/brighter needles (`0xff4400`, length 0.048)
-5. **Airstrip Visibility** — gridSpacing 3000→1500, height filter 250→500, 25m airport beacon with bright green emissive sphere, approach lights (5 per threshold), taller control tower (16m)
-6. **Attitude Indicator** — Canvas 120px→180px, bank angle marks (±10°/20°/30°/60°/90°), miniature airplane symbol (orange wings+dot), pitch degree labels, brighter green border with glow
+1. **F-117 Nighthawk** (aircraft index 5) — Angular stealth geometry, matte black 0x1a1a1a, V-tail, gold-tinted canopy, flat exhaust slot, afterburner cone
+2. **F-14 Tomcat** (aircraft index 6) — Swept-wing twin-engine fighter, twin vertical tails, box intakes, Navy-style orange tail stripes, twin afterburner cones
+3. **Afterburner Effects** — `updateAfterburner()` method on AircraftModels. Below 10% throttle: hidden. 10-85%: small dim glow. Above 85%: big pulsing flames with flickering
+4. **F-117 Cockpit** — Dark angular panels, HUD frame (green wireframe), side stick, gold-tint canopy glass, ejection seat, SPD/ALT/HDG gauges with green ticks
+5. **F-14 Cockpit** — Full six-pack instruments, HUD frame, center stick with trigger, twin throttle levers, radar scope, Mach display, canopy bow frame, ejection seat
+6. **Spacebar Brakes** — Space key applies brakes on ground (speed *= 0.92 per frame). Works on all wheeled aircraft (Biplane, Cessna, Glider, F-117, F-14). Excluded: Paraglider and Hang Glider
+7. **Ground Steering** — Left/right arrows apply yaw (nose-wheel steering) when on ground at speed < 30. Steering sensitivity decreases with speed. Above 30 or in air: normal roll
+8. **Safe Landing Speeds** — Now scale with aircraft maxSpeed so jets can land at higher speeds without crashing (15% of maxSpeed for gentle, 25% for runway landing)
+9. **Controls Updated** — All UI text updated: Space = Brake, 1-7 = Aircraft
 
 ## Build Status
-- Syntax check: PASSED (`node --check`)
-- Opened in browser — needs device testing
-- Commit: `5e94101` on `main`
-- Tag: `before-color-airstrip-attitude-feb26` marks pre-change state
+- Syntax check: PASSED
+- Commit: `13a2e4f` on `main`
+- Tag: `before-f117-f14-afterburner-feb27` marks pre-change state
+- Pushed to GitHub
 
 ## Next Steps
 - Test on device (iPhone)
-- Verify biplane is visibly red in both cockpit and chase views
-- Verify at 1000ft altitude, rotating 360° shows 1-3 airstrips with green beacons
-- Verify attitude indicator is clearly visible at bottom center with bank marks
-- Check all aircraft have distinct vibrant colors (no gray/brown planes)
+- Verify F-117 visible as angular black stealth jet in chase view
+- Verify F-14 visible as gray twin-engine swept-wing fighter
+- Full throttle on either jet — check for flaming afterburners from chase view
+- Land on runway, press Space — aircraft should stop
+- On ground at low speed, left/right arrows should steer (yaw turn, not roll)
+- All 7 aircraft selectable via dropdown and keys 1-7
+- Existing aircraft (Biplane, Cessna, Glider, Paraglider, Hang Glider) still work
 
 ## Known Issues
-- None yet — awaiting device test feedback
+- Auto-level (Space) removed — replaced by brake. If auto-level is missed, could re-add on a different key
+- F-117/F-14 landing speeds are high compared to prop planes — may need tuning after device testing
 
 ## Git
 - Repo: `/Users/michaelashe/Projects/InfiniteFlight`
+- Remote: `https://github.com/MyCache63/InfiniteFlight.git`
 - Branch: `main`
-- No remote set up yet
