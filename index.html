@@ -49,6 +49,9 @@ canvas#main{display:block;width:100vw;height:100vh}
 #crash-overlay.active{display:flex}
 #crash-overlay h1{font-family:'Courier New',monospace;font-size:72px;color:#ff3333;text-shadow:0 0 30px #ff000088,0 0 60px #ff000044;margin-bottom:20px}
 #crash-overlay p{font-family:'Courier New',monospace;font-size:18px;color:#ff8888;animation:pulse 2s infinite}
+#taxi-hud{position:fixed;bottom:200px;left:50%;transform:translateX(-50%);z-index:15;display:none;background:rgba(0,20,10,0.8);border:1px solid #00ff8866;border-radius:6px;padding:8px 18px;font-family:'Courier New',monospace;font-size:13px;color:#00ff88;text-shadow:0 0 8px #00ff8866;letter-spacing:1px}
+#taxi-hud.active{display:block}
+#taxi-hud span{color:#00ffaa;font-weight:bold}
 #godmode-indicator{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:15;display:none;background:rgba(0,20,10,0.7);border:1px solid #ffaa00;border-radius:4px;padding:4px 14px;font-family:'Courier New',monospace;font-size:13px;color:#ffaa00;text-shadow:0 0 8px #ffaa0066;letter-spacing:2px}
 #godmode-indicator.active{display:block}
 #view-btn{position:fixed;bottom:20px;right:20px;z-index:15;background:rgba(0,20,10,0.7);border:1px solid #00ff8844;border-radius:6px;padding:8px 14px;font-family:'Courier New',monospace;font-size:12px;color:#00ff88;cursor:pointer;text-shadow:0 0 6px #00ff8866}
@@ -150,6 +153,7 @@ canvas#main{display:block;width:100vw;height:100vh}
   <h1>CRASHED</h1>
   <p>Press R to restart</p>
 </div>
+<div id="taxi-hud">GROUND  <span>←→</span> Steer  <span>Space</span> Brake  <span>W/⇧</span> Throttle</div>
 <div id="godmode-indicator">GOD MODE</div>
 <div id="autopilot-indicator">AUTOPILOT</div>
 <button id="view-btn">V: Cockpit</button>
@@ -335,23 +339,27 @@ const LOCATIONS = [
   },
   { // 4: Yosemite
     name: 'Yosemite',
-    noiseScale: 0.0008, amplitude: 250, octaves: 7, lacunarity: 2, gain: 0.55, ridgeFactor: 0.7,
+    noiseScale: 0.0006, amplitude: 350, octaves: 7, lacunarity: 2, gain: 0.55, ridgeFactor: 0.6,
     plateauFactor: 0, waterLevel: -5, seaFloor: -20,
+    yosemiteSculpt: true,
     colors: [
-      { h: -20, color: [0.1, 0.2, 0.3] },
-      { h: 0, color: [0.15, 0.35, 0.1] },
-      { h: 30, color: [0.2, 0.45, 0.15] },
-      { h: 80, color: [0.5, 0.5, 0.45] },
-      { h: 150, color: [0.65, 0.63, 0.6] },
-      { h: 200, color: [0.8, 0.78, 0.75] },
-      { h: 250, color: [0.95, 0.95, 0.95] }
+      { h: -20, color: [0.08, 0.15, 0.25] },
+      { h: -2, color: [0.1, 0.25, 0.35] },
+      { h: 0, color: [0.12, 0.32, 0.08] },
+      { h: 20, color: [0.18, 0.42, 0.12] },
+      { h: 50, color: [0.22, 0.38, 0.14] },
+      { h: 90, color: [0.55, 0.52, 0.47] },
+      { h: 140, color: [0.68, 0.66, 0.62] },
+      { h: 200, color: [0.78, 0.76, 0.72] },
+      { h: 260, color: [0.85, 0.83, 0.8] },
+      { h: 320, color: [0.95, 0.94, 0.92] }
     ],
-    skyTurbidity: 5, skyRayleigh: 2, skyMie: 0.003, skyMieG: 0.8,
-    sunElevation: 40, sunAzimuth: 190,
-    waterColor: 0x2a5a4a, waterSunColor: 0xeeeecc, waterDistortion: 1.5,
-    fogColor: 0x8899aa, fogNear: 400, fogFar: 3000,
-    treeTypes: ['conifer', 'deciduous'], treeDensity: 0.35, treeMinH: 0, treeMaxH: 60,
-    startAlt: 300, landmark: 'waterfall'
+    skyTurbidity: 4, skyRayleigh: 2.2, skyMie: 0.003, skyMieG: 0.8,
+    sunElevation: 38, sunAzimuth: 200,
+    waterColor: 0x1a4a3a, waterSunColor: 0xddddbb, waterDistortion: 1.0,
+    fogColor: 0x7a8a9a, fogNear: 600, fogFar: 4000,
+    treeTypes: ['conifer', 'deciduous'], treeDensity: 0.4, treeMinH: -5, treeMaxH: 80,
+    startAlt: 400, landmark: 'waterfall'
   },
   { // 5: SF Bay
     name: 'SF Bay',
@@ -455,6 +463,238 @@ class TerrainSystem {
       h = h * (1 - blend * L.plateauFactor) + plateauH * blend * L.plateauFactor;
     }
     if (h < L.seaFloor) h = L.seaFloor;
+    // Yosemite custom sculpting
+    if (L.yosemiteSculpt) h = this.sculptYosemite(wx, wz, h);
+    return h;
+  }
+  // ─── Yosemite Terrain Sculpting ───
+  // Real landmark positions in meters, origin = center of Yosemite Valley
+  // Valley floor ~0m in game coords, rim ~150-250m, peaks to 320m
+  // Real elevations: floor 1200m, rim 2000-2700m, scaled to game units
+  sculptYosemite(wx, wz, baseH) {
+    // Scale factor: real world 1500m of relief → game ~300 units
+    // Valley floor = 0, rim = 150-200, Half Dome summit = 300
+    let h = baseH;
+    // ── Valley Floor Carving ──
+    // The valley runs roughly east-west with a slight SW curve at the west end
+    // Valley center path as a series of segments
+    const valleyPath = [
+      { x: -1600, z: -500, w: 400 },   // West exit / Valley View
+      { x: -1200, z: -400, w: 450 },   // El Cap Meadow area
+      { x: -800, z: -300, w: 500 },    // Cathedral Beach
+      { x: -400, z: -100, w: 500 },    // Swinging Bridge
+      { x: 0, z: 0, w: 500 },          // Sentinel Bridge / center
+      { x: 400, z: -50, w: 450 },      // Curry Village area
+      { x: 700, z: -100, w: 400 },     // Happy Isles approach
+      { x: 900, z: -150, w: 300 },     // Upper valley narrows
+    ];
+    // Find nearest valley segment and compute distance to valley centerline
+    let minValleyDist = Infinity;
+    for (let i = 0; i < valleyPath.length - 1; i++) {
+      const p0 = valleyPath[i], p1 = valleyPath[i + 1];
+      const dx = p1.x - p0.x, dz = p1.z - p0.z;
+      const len2 = dx * dx + dz * dz;
+      let t = Math.max(0, Math.min(1, ((wx - p0.x) * dx + (wz - p0.z) * dz) / len2));
+      const cx = p0.x + t * dx, cz = p0.z + t * dz;
+      const dist = Math.sqrt((wx - cx) * (wx - cx) + (wz - cz) * (wz - cz));
+      const halfW = p0.w * (1 - t) + p1.w * t;
+      const normalizedDist = dist / halfW;
+      if (normalizedDist < minValleyDist) minValleyDist = normalizedDist;
+    }
+    // Carve the valley floor - flat bottom with steep walls
+    if (minValleyDist < 1.0) {
+      // Inside valley: force to valley floor level
+      const floorH = -2 + this.noise.noise2D(wx * 0.01, wz * 0.01) * 3;
+      // Transition: flat floor in center, steep walls at edges
+      const wallSteepness = 4.0; // Higher = steeper walls
+      const wallStart = 0.6; // Where walls begin (60% of half-width)
+      if (minValleyDist < wallStart) {
+        // Flat valley floor
+        h = floorH;
+      } else {
+        // Steep wall transition — exponential rise
+        const wallT = (minValleyDist - wallStart) / (1.0 - wallStart);
+        const wallH = Math.pow(wallT, wallSteepness) * 200;
+        h = floorH + wallH;
+      }
+    } else if (minValleyDist < 1.5) {
+      // Rim area — blend between carved wall and natural terrain
+      const blendT = (minValleyDist - 1.0) / 0.5;
+      const rimH = 150 + this.noise.noise2D(wx * 0.003, wz * 0.003) * 40;
+      h = rimH * (1 - blendT) + baseH * blendT;
+      // Ensure rim is at least 150m
+      h = Math.max(h, 120);
+    }
+    // ── Merced River ──
+    // Carve a shallow channel through the valley floor
+    const riverPath = [
+      { x: -1500, z: -450 }, { x: -1000, z: -350 }, { x: -500, z: -150 },
+      { x: 0, z: -30 }, { x: 400, z: -80 }, { x: 700, z: -120 }, { x: 900, z: -160 }
+    ];
+    let minRiverDist = Infinity;
+    for (let i = 0; i < riverPath.length - 1; i++) {
+      const p0 = riverPath[i], p1 = riverPath[i + 1];
+      const dx = p1.x - p0.x, dz = p1.z - p0.z;
+      const len2 = dx * dx + dz * dz;
+      let t = Math.max(0, Math.min(1, ((wx - p0.x) * dx + (wz - p0.z) * dz) / len2));
+      const cx = p0.x + t * dx, cz = p0.z + t * dz;
+      minRiverDist = Math.min(minRiverDist, Math.sqrt((wx - cx) * (wx - cx) + (wz - cz) * (wz - cz)));
+    }
+    if (minRiverDist < 20 && minValleyDist < 0.7) {
+      const riverDepth = -5 * (1 - minRiverDist / 20);
+      h = Math.min(h, riverDepth);
+    }
+    // ── Half Dome — X:+1100, Z:+150 (scaled ~4700m → ~1100 game units) ──
+    const hdx = wx - 1100, hdz = wz - 150;
+    const hdDist = Math.sqrt(hdx * hdx + hdz * hdz);
+    if (hdDist < 350) {
+      // Angle from center — the sheer face points northwest (toward valley)
+      const hdAngle = Math.atan2(hdz, hdx);
+      const nwAngle = Math.atan2(1, -1); // northwest direction
+      let angleDiff = Math.abs(hdAngle - nwAngle);
+      if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+      // Summit height
+      const hdSummit = 300; // ~2694m - 1200m floor = 1494m → 300 game units
+      if (hdDist < 150) {
+        // Near summit
+        const radialFade = hdDist / 150;
+        if (angleDiff < 1.2) {
+          // Sheer northwest face — nearly vertical cliff
+          const cliffFactor = Math.pow(radialFade, 0.15); // Very steep
+          h = Math.max(h, hdSummit * (1 - cliffFactor * 0.9));
+        } else {
+          // Rounded dome side (southeast)
+          const domeFactor = 1 - Math.pow(radialFade, 1.8); // Smooth dome curve
+          h = Math.max(h, hdSummit * domeFactor);
+        }
+      } else {
+        // Flanks of Half Dome
+        const flankFade = 1 - (hdDist - 150) / 200;
+        const flankH = hdSummit * 0.5 * flankFade;
+        if (angleDiff < 1.2) {
+          // Below the sheer face — steep cliff base
+          h = Math.max(h, flankH * 0.3);
+        } else {
+          h = Math.max(h, flankH);
+        }
+      }
+    }
+    // ── El Capitan — X:-1050, Z:-130 ──
+    const ecx = wx - (-1050), ecz = wz - (-130);
+    const ecDist = Math.sqrt(ecx * ecx + ecz * ecz);
+    if (ecDist < 400) {
+      const ecSummit = 220; // ~2307m - 1200m = 1107m → 220 game units
+      // El Cap's famous south face is a sheer 900m wall
+      const ecAngle = Math.atan2(ecz, ecx);
+      const southAngle = Math.atan2(-1, 0);
+      let ecAngleDiff = Math.abs(ecAngle - southAngle);
+      if (ecAngleDiff > Math.PI) ecAngleDiff = 2 * Math.PI - ecAngleDiff;
+      if (ecDist < 200) {
+        if (ecAngleDiff < 1.5) {
+          // Sheer south/SW face — "The Nose" and main wall
+          const cliffFactor = Math.pow(ecDist / 200, 0.12);
+          h = Math.max(h, ecSummit * (1 - cliffFactor * 0.85));
+        } else {
+          // Gentler north/top side
+          const domeFactor = 1 - Math.pow(ecDist / 200, 1.5);
+          h = Math.max(h, ecSummit * domeFactor);
+        }
+      } else {
+        // El Cap flanks
+        const flankFade = 1 - (ecDist - 200) / 200;
+        h = Math.max(h, ecSummit * 0.4 * flankFade);
+      }
+    }
+    // ── Cathedral Rocks — X:-1050, Z:-600 ──
+    const crx = wx - (-1050), crz = wz - (-600);
+    const crDist = Math.sqrt(crx * crx + crz * crz);
+    if (crDist < 250) {
+      const crSummit = 160; // ~1988m - 1200m = 788m → 160 units
+      // Three spires — add peaked geometry
+      const spireOffsets = [{ x: -60, z: -30, h: 160 }, { x: 0, z: 0, h: 150 }, { x: 50, z: 20, h: 140 }];
+      for (const sp of spireOffsets) {
+        const spDist = Math.sqrt((wx - (-1050 + sp.x)) ** 2 + (wz - (-600 + sp.z)) ** 2);
+        if (spDist < 120) {
+          const spH = sp.h * (1 - Math.pow(spDist / 120, 1.3));
+          h = Math.max(h, spH);
+        }
+      }
+    }
+    // ── Sentinel Rock — X:-60, Z:-250 ──
+    const srx = wx - (-60), srz = wz - (-250);
+    const srDist = Math.sqrt(srx * srx + srz * srz);
+    if (srDist < 200) {
+      const srSummit = 190; // ~2145m - 1200m = 945m → 190 units
+      // Triangular/pyramidal profile
+      const srH = srSummit * (1 - Math.pow(srDist / 200, 1.4));
+      h = Math.max(h, srH);
+    }
+    // ── Glacier Point — X:+260, Z:-320 ──
+    const gpx = wx - 260, gpz = wz - (-320);
+    const gpDist = Math.sqrt(gpx * gpx + gpz * gpz);
+    if (gpDist < 250) {
+      const gpSummit = 200; // ~2199m - 1200m = 999m → 200 units
+      // Flat-topped overlook with steep north face
+      const gpAngle = Math.atan2(gpz, gpx);
+      if (gpDist < 120) {
+        // Top plateau
+        const topH = gpSummit * (1 - Math.pow(gpDist / 200, 2));
+        h = Math.max(h, topH);
+      } else {
+        const flankFade = 1 - (gpDist - 120) / 130;
+        h = Math.max(h, gpSummit * 0.4 * flankFade);
+      }
+    }
+    // ── North Dome — X:+560, Z:+460 ──
+    const ndx = wx - 560, ndz = wz - 460;
+    const ndDist = Math.sqrt(ndx * ndx + ndz * ndz);
+    if (ndDist < 200) {
+      const ndSummit = 220; // ~2302m - 1200m = 1102m → 220 units
+      // Smooth rounded dome
+      const ndH = ndSummit * (1 - Math.pow(ndDist / 200, 2));
+      h = Math.max(h, ndH);
+    }
+    // ── Sentinel Dome — X:+55, Z:-430 ──
+    const sdx = wx - 55, sdz = wz - (-430);
+    const sdDist = Math.sqrt(sdx * sdx + sdz * sdz);
+    if (sdDist < 180) {
+      const sdSummit = 255; // ~2476m - 1200m = 1276m → 255 units
+      const sdH = sdSummit * (1 - Math.pow(sdDist / 180, 2));
+      h = Math.max(h, sdH);
+    }
+    // ── Clouds Rest — X:+2000, Z:+750 (far east, highest point) ──
+    const clx = wx - 2000, clz = wz - 750;
+    const clDist = Math.sqrt(clx * clx + clz * clz);
+    if (clDist < 400) {
+      const clSummit = 365; // ~3025m - 1200m = 1825m → 365 units
+      // Broad ridge
+      const clH = clSummit * (1 - Math.pow(clDist / 400, 1.6));
+      h = Math.max(h, clH);
+    }
+    // ── Yosemite Falls cliff — X:-200, Z:+460 ──
+    const yfx = wx - (-200), yfz = wz - 460;
+    const yfDist = Math.sqrt(yfx * yfx + yfz * yfz);
+    if (yfDist < 180) {
+      const yfSummit = 150; // Upper Yosemite Falls launch point
+      const yfH = yfSummit * (1 - Math.pow(yfDist / 180, 1.3));
+      h = Math.max(h, yfH);
+    }
+    // ── Ensure rim is elevated around the valley ──
+    // General south rim elevation boost
+    if (wz < -200 && wz > -800 && Math.abs(wx) < 1500) {
+      const rimBoost = 140 + this.noise.noise2D(wx * 0.002, wz * 0.002) * 30;
+      const rimBlend = Math.min(1, Math.max(0, (-wz - 200) / 300));
+      h = Math.max(h, rimBoost * rimBlend);
+    }
+    // General north rim elevation boost
+    if (wz > 200 && wz < 800 && Math.abs(wx) < 1500) {
+      const rimBoost = 130 + this.noise.noise2D(wx * 0.002 + 50, wz * 0.002 + 50) * 30;
+      const rimBlend = Math.min(1, Math.max(0, (wz - 200) / 300));
+      h = Math.max(h, rimBoost * rimBlend);
+    }
+    // Add granite texture noise on cliff faces
+    const slopeNoise = this.noise.noise2D(wx * 0.02, wz * 0.02) * 3;
+    if (h > 50) h += slopeNoise * (h / 300);
     return h;
   }
   getColorForHeight(h) {
@@ -2518,75 +2758,84 @@ class AircraftModels {
     const darkGray = mat(0x222222);
     const canopyMat = mat(0xaa8833, { transparent: true, opacity: 0.4, metalness: 0.3 });
     const metal = mat(0x333333, { metalness: 0.5 });
-    // Faceted fuselage — flat wedge shape
-    const fuseShape = new THREE.Shape();
-    fuseShape.moveTo(0, -0.3);
-    fuseShape.lineTo(-0.9, -0.15);
-    fuseShape.lineTo(-0.7, 0.2);
-    fuseShape.lineTo(0, 0.35);
-    fuseShape.lineTo(0.7, 0.2);
-    fuseShape.lineTo(0.9, -0.15);
-    fuseShape.closePath();
-    const fuseGeo = new THREE.ExtrudeGeometry(fuseShape, { depth: 5.5, bevelEnabled: false });
-    const fuse = new THREE.Mesh(fuseGeo, black);
-    fuse.rotation.x = Math.PI / 2;
-    fuse.position.set(0, 0, -2.5);
-    group.add(fuse);
-    // Nose cone — angular pyramid
-    const noseGeo = new THREE.ConeGeometry(0.6, 2.5, 4);
-    const nose = new THREE.Mesh(noseGeo, black);
-    nose.rotation.x = -Math.PI / 2;
-    nose.rotation.y = Math.PI / 4;
-    nose.position.set(0, 0, -3.8);
-    group.add(nose);
-    // Canopy — small angular gold-tinted
-    const canopyGeo = new THREE.BoxGeometry(0.6, 0.25, 0.9);
-    const canopy = new THREE.Mesh(canopyGeo, canopyMat);
-    canopy.position.set(0, 0.4, -1.8);
-    group.add(canopy);
-    const canopyFrame = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.02, 0.95), darkGray);
-    canopyFrame.position.set(0, 0.52, -1.8);
-    group.add(canopyFrame);
-    // Highly swept delta wings
+    // Main fuselage — wide flat diamond cross-section using boxes
+    const fuseTop = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.4, 6.0), black);
+    fuseTop.position.set(0, 0.1, 0);
+    group.add(fuseTop);
+    const fuseBelly = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.35, 5.8), black);
+    fuseBelly.position.set(0, -0.2, 0);
+    group.add(fuseBelly);
+    // Angled side panels (faceted stealth look)
     for (let s = -1; s <= 1; s += 2) {
-      const wingShape = new THREE.Shape();
-      wingShape.moveTo(0, 0);
-      wingShape.lineTo(s * 5.5, 0);
-      wingShape.lineTo(s * 2, -3.5);
-      wingShape.lineTo(0, -1);
-      wingShape.closePath();
-      const wingGeo = new THREE.ShapeGeometry(wingShape);
-      wingGeo.rotateX(-Math.PI / 2);
-      const wing = new THREE.Mesh(wingGeo, new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.5, side: THREE.DoubleSide }));
-      wing.position.set(0, -0.1, 0.5);
-      group.add(wing);
+      const sidePanel = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.6, 5.5), black);
+      sidePanel.position.set(s * 1.1, -0.05, 0);
+      sidePanel.rotation.z = s * 0.4;
+      group.add(sidePanel);
     }
+    // Angular nose — wedge shape using tapered box
+    const noseTip = new THREE.Mesh(new THREE.ConeGeometry(0.5, 2.8, 4), black);
+    noseTip.rotation.x = -Math.PI / 2;
+    noseTip.rotation.y = Math.PI / 4;
+    noseTip.position.set(0, -0.05, -4.2);
+    group.add(noseTip);
+    // Nose blend section
+    const noseBlend = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.5, 1.2), black);
+    noseBlend.position.set(0, 0, -3.0);
+    group.add(noseBlend);
+    // Canopy — small angular gold-tinted
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.3, 1.0), canopyMat);
+    canopy.position.set(0, 0.5, -1.5);
+    group.add(canopy);
+    // Canopy frame edges
+    for (let s = -1; s <= 1; s += 2) {
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.32, 1.05), darkGray);
+      frame.position.set(s * 0.37, 0.5, -1.5);
+      group.add(frame);
+    }
+    const frameFront = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.32, 0.04), darkGray);
+    frameFront.position.set(0, 0.5, -2.0);
+    group.add(frameFront);
+    // Highly swept delta wings — thick box geometry
+    for (let s = -1; s <= 1; s += 2) {
+      // Inner wing section
+      const wingInner = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.1, 3.5), black);
+      wingInner.position.set(s * 2.4, -0.15, 0.3);
+      wingInner.rotation.y = s * -0.15;
+      group.add(wingInner);
+      // Outer wing section (swept back more)
+      const wingOuter = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.08, 2.0), black);
+      wingOuter.position.set(s * 4.5, -0.15, 1.0);
+      wingOuter.rotation.y = s * -0.25;
+      group.add(wingOuter);
+    }
+    // Tail section — tapered rear
+    const tailBody = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.35, 2.5), black);
+    tailBody.position.set(0, 0, 2.8);
+    group.add(tailBody);
     // V-tail — two angled stabilizers
     for (let s = -1; s <= 1; s += 2) {
-      const tailGeo = new THREE.BoxGeometry(1.8, 0.08, 1.2);
-      const tail = new THREE.Mesh(tailGeo, black);
-      tail.position.set(s * 1.2, 0.5, 2.8);
+      const tail = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.08, 1.4), black);
+      tail.position.set(s * 1.0, 0.5, 3.5);
       tail.rotation.z = s * 0.55;
       group.add(tail);
     }
     // Flat rectangular exhaust slot
-    const exhaustSlot = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.2, 0.3), darkGray);
-    exhaustSlot.position.set(0, -0.05, 3.0);
+    const exhaustSlot = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.25, 0.4), darkGray);
+    exhaustSlot.position.set(0, -0.1, 4.0);
     group.add(exhaustSlot);
-    const exhaustInner = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.12, 0.15), mat(0x111111));
-    exhaustInner.position.set(0, -0.05, 3.1);
+    const exhaustInner = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.15, 0.2), mat(0x111111));
+    exhaustInner.position.set(0, -0.1, 4.15);
     group.add(exhaustInner);
     // Afterburner flame cone
     const abGeo = new THREE.ConeGeometry(0.3, 2.5, 8);
     const abMat = new THREE.MeshStandardMaterial({ color: 0xff6600, emissive: 0xff4400, emissiveIntensity: 1.5, transparent: true, opacity: 0.8 });
     const afterburner = new THREE.Mesh(abGeo, abMat);
     afterburner.rotation.x = Math.PI / 2;
-    afterburner.position.set(0, -0.05, 4.3);
+    afterburner.position.set(0, -0.1, 5.4);
     afterburner.name = 'afterburner';
     afterburner.visible = false;
     group.add(afterburner);
     // Tricycle landing gear
-    // Nose gear
     const noseGearLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.8, 5), metal);
     noseGearLeg.position.set(0, -0.7, -2.5);
     group.add(noseGearLeg);
@@ -2594,7 +2843,6 @@ class AircraftModels {
     noseWheel.position.set(0, -1.1, -2.5);
     noseWheel.rotation.y = Math.PI / 2;
     group.add(noseWheel);
-    // Main gear
     for (let s = -1; s <= 1; s += 2) {
       const mainLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.9, 5), metal);
       mainLeg.position.set(s * 1.2, -0.75, 0.5);
@@ -3054,13 +3302,29 @@ class FlightPhysics {
     }
     const drag = ac.drag * this.speed * this.speed;
     this.speed -= drag * dt;
-    // Gravity component
+    // Realistic gravity — full 9.81 component along flight path
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.quaternion);
-    const gravEffect = -forward.y * 9.81 * 0.3;
+    const gravEffect = -forward.y * 9.81;
     this.speed += gravEffect * dt;
-    // Lift (keep airborne if moving fast enough)
-    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(this.quaternion);
+    // Lift force — creates natural glide when flying level or slightly nose-down
     const liftForce = ac.liftFactor * this.speed * 0.01;
+    // Natural glide path: all aircraft sink without thrust (not just unpowered)
+    // The sink rate depends on speed and lift — faster with more lift = shallower glide
+    let sinkRate = 0;
+    if (!this.onGround) {
+      if (ac.hasEngine && this.throttle < 0.05) {
+        // Engine idle/off: aircraft glides, sinking ~2-4 m/s depending on lift
+        sinkRate = 3.0 - liftForce * 0.8;
+      } else if (ac.hasEngine) {
+        // Partial thrust: slight sink if underpowered, zero if enough thrust
+        const thrustNeeded = 9.81 * 0.15; // approximate level flight thrust
+        const thrustHave = ac.thrust * this.throttle * 0.03;
+        sinkRate = Math.max(0, thrustNeeded - thrustHave);
+      } else {
+        // Unpowered aircraft (glider, paraglider, hang glider)
+        sinkRate = 2.0 - liftForce * 0.5;
+      }
+    }
     // Thermals for unpowered aircraft
     let thermalLift = 0;
     if (!ac.hasEngine) {
@@ -3073,15 +3337,17 @@ class FlightPhysics {
         }
       }
     }
-    // Clamp speed
-    this.speed = Math.max(2, Math.min(ac.maxSpeed, this.speed));
+    // Terminal velocity: limit speed based on drag, not just maxSpeed
+    // When diving straight down, terminal velocity = sqrt(weight / drag)
+    const terminalVelocity = Math.min(ac.maxSpeed * 1.4, Math.sqrt(400 / ac.drag));
+    // Clamp speed — can exceed maxSpeed in a dive (up to terminal velocity) but not below 1
+    this.speed = Math.max(1, Math.min(terminalVelocity, this.speed));
     // Move
     this.position.addScaledVector(forward, this.speed * dt);
     this.position.y += thermalLift * dt;
-    // Sink rate for unpowered
-    if (!ac.hasEngine && thermalLift < 1) {
-      const sinkRate = 2 - liftForce * 0.5;
-      this.position.y -= Math.max(0, sinkRate) * dt;
+    // Apply sink rate (reduced by thermals)
+    if (sinkRate > 0 && thermalLift < sinkRate) {
+      this.position.y -= Math.max(0, sinkRate - thermalLift) * dt;
     }
     // Ground / crash detection
     const groundH = terrain.getHeight(this.position.x, this.position.z);
@@ -3298,6 +3564,7 @@ class HUDManager {
     this.crashOverlay = document.getElementById('crash-overlay');
     this.godmodeIndicator = document.getElementById('godmode-indicator');
     this.autopilotIndicator = document.getElementById('autopilot-indicator');
+    this.taxiHud = document.getElementById('taxi-hud');
     this.viewBtn = document.getElementById('view-btn');
     this.instructionsVisible = true;
     this.currentAircraftIndex = 1;
@@ -3332,6 +3599,11 @@ class HUDManager {
     this.altEl.textContent = alt;
     this.hdgEl.textContent = String(hdg).padStart(3, '0');
     this.throttleFill.style.height = (physics.throttle * 100) + '%';
+    // Show taxi controls when on ground (not paraglider/hang glider)
+    const acIdx = AIRCRAFT.indexOf(physics.aircraft);
+    const showTaxi = physics.onGround && acIdx !== 3 && acIdx !== 4 && !physics.crashed;
+    if (showTaxi) this.taxiHud.classList.add('active');
+    else this.taxiHud.classList.remove('active');
     this.drawHorizon(physics.getPitch(), physics.getRoll());
     this.drawInstrumentPanel(physics);
   }
