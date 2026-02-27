@@ -74,6 +74,8 @@ canvas#main{display:block;width:100vw;height:100vh}
       <option value="2">Glider</option>
       <option value="3">Paraglider</option>
       <option value="4">Hang Glider</option>
+      <option value="5">F-117 Nighthawk</option>
+      <option value="6">F-14 Tomcat</option>
     </select>
     <select id="location-select">
       <option value="0" selected>Tropical Islands</option>
@@ -106,12 +108,12 @@ canvas#main{display:block;width:100vw;height:100vh}
       <tr><td>← / →</td><td>Roll</td></tr>
       <tr><td>W / Shift</td><td>Throttle Up</td></tr>
       <tr><td>S / Ctrl</td><td>Throttle Down</td></tr>
-      <tr><td>Space</td><td>Auto-level</td></tr>
+      <tr><td>Space</td><td>Brake (ground)</td></tr>
       <tr><td>V</td><td>Toggle View</td></tr>
       <tr><td>G</td><td>God Mode</td></tr>
       <tr><td>R</td><td>Reset</td></tr>
       <tr><td>A</td><td>AutoPilot Tour</td></tr>
-      <tr><td>1-5</td><td>Switch Aircraft</td></tr>
+      <tr><td>1-7</td><td>Switch Aircraft</td></tr>
       <tr><td>Mouse</td><td>Look Around (click first)</td></tr>
       <tr><td>ESC</td><td>Menu / Release Mouse</td></tr>
     </table>
@@ -126,12 +128,12 @@ canvas#main{display:block;width:100vw;height:100vh}
       <tr><td>← / →</td><td>Roll</td></tr>
       <tr><td>W / Shift</td><td>Throttle Up</td></tr>
       <tr><td>S / Ctrl</td><td>Throttle Down</td></tr>
-      <tr><td>Space</td><td>Auto-level</td></tr>
+      <tr><td>Space</td><td>Brake (ground)</td></tr>
       <tr><td>V</td><td>Toggle View</td></tr>
       <tr><td>G</td><td>God Mode</td></tr>
       <tr><td>R</td><td>Reset</td></tr>
       <tr><td>A</td><td>AutoPilot Tour</td></tr>
-      <tr><td>1-5</td><td>Switch Aircraft</td></tr>
+      <tr><td>1-7</td><td>Switch Aircraft</td></tr>
       <tr><td>Mouse</td><td>Look Around</td></tr>
     </table>
     <div class="close-hint">Press ESC to close</div>
@@ -140,9 +142,9 @@ canvas#main{display:block;width:100vw;height:100vh}
 <div id="controls-panel">
   <span>↑↓</span> Pitch &nbsp;<span>←→</span> Roll<br>
   <span>W/⇧</span> Thr+ &nbsp;<span>S/Ctrl</span> Thr-<br>
-  <span>Space</span> Level &nbsp;<span>V</span> View<br>
+  <span>Space</span> Brake &nbsp;<span>V</span> View<br>
   <span>G</span> God Mode &nbsp;<span>R</span> Reset<br>
-  <span>A</span> AutoPilot &nbsp;<span>1-5</span> Aircraft
+  <span>A</span> AutoPilot &nbsp;<span>1-7</span> Aircraft
 </div>
 <div id="crash-overlay">
   <h1>CRASHED</h1>
@@ -417,7 +419,9 @@ const AIRCRAFT = [
   { name:'Cessna', maxSpeed:75, thrust:35, drag:0.012, liftFactor:1.0, pitchRate:1.0, rollRate:1.8, yawRate:0.25, hasEngine:true },
   { name:'Glider', maxSpeed:60, thrust:0, drag:0.006, liftFactor:1.8, pitchRate:0.8, rollRate:2.2, yawRate:0.2, hasEngine:false },
   { name:'Paraglider', maxSpeed:18, thrust:0, drag:0.04, liftFactor:2.5, pitchRate:0.5, rollRate:1.0, yawRate:0.4, hasEngine:false },
-  { name:'Hang Glider', maxSpeed:28, thrust:0, drag:0.02, liftFactor:2.0, pitchRate:0.6, rollRate:1.5, yawRate:0.35, hasEngine:false }
+  { name:'Hang Glider', maxSpeed:28, thrust:0, drag:0.02, liftFactor:2.0, pitchRate:0.6, rollRate:1.5, yawRate:0.35, hasEngine:false },
+  { name:'F-117 Nighthawk', maxSpeed:280, thrust:120, drag:0.008, liftFactor:0.7, pitchRate:1.4, rollRate:2.5, yawRate:0.3, hasEngine:true, hasAfterburner:true },
+  { name:'F-14 Tomcat', maxSpeed:350, thrust:160, drag:0.007, liftFactor:0.8, pitchRate:1.6, rollRate:3.0, yawRate:0.35, hasEngine:true, hasAfterburner:true }
 ];
 
 const CHUNK_SIZE = 512;
@@ -1011,6 +1015,8 @@ class CockpitRenderer {
       case 2: this.buildGlider(mat); break;
       case 3: this.buildParaglider(mat); break;
       case 4: this.buildHangGlider(mat); break;
+      case 5: this.buildF117(mat); break;
+      case 6: this.buildF14(mat); break;
     }
   }
   add(mesh) { this.group.add(mesh); }
@@ -1760,6 +1766,273 @@ class CockpitRenderer {
     helmetRim.rotation.x = 0.3;
     this.add(helmetRim);
   }
+  buildF117(mat) {
+    const dark = mat(0x111111);
+    const darkPanel = mat(0x0a0a0a);
+    const metal = mat(0x333333, { metalness: 0.6 });
+    const greenHUD = mat(0x00ff44, { emissive: 0x00ff44, emissiveIntensity: 0.6, transparent: true, opacity: 0.3 });
+    const canopyGlass = mat(0xaa8833, { transparent: true, opacity: 0.08 });
+    const hudLine = new THREE.LineBasicMaterial({ color: 0x00ff44, transparent: true, opacity: 0.6 });
+    // Angular side panels
+    for (let s = -1; s <= 1; s += 2) {
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.45, 1.4), dark);
+      panel.position.set(s * 0.55, -0.45, -0.2);
+      this.add(panel);
+      const coaming = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.03, 1.2), metal);
+      coaming.position.set(s * 0.54, -0.22, -0.2);
+      this.add(coaming);
+    }
+    // Floor
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.03, 1.3), mat(0x0a0a0a));
+    floor.position.set(0, -0.7, -0.2);
+    this.add(floor);
+    // Main instrument panel — angular, dark
+    const dash = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.3, 0.06), darkPanel);
+    dash.position.set(0, -0.5, -1.0);
+    this.add(dash);
+    const dashTop = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.03, 0.1), metal);
+    dashTop.position.set(0, -0.34, -0.96);
+    this.add(dashTop);
+    // HUD frame — thin green wireframe
+    const hudPts = [
+      new THREE.Vector3(-0.2, 0.1, -0.9),
+      new THREE.Vector3(0.2, 0.1, -0.9),
+      new THREE.Vector3(0.2, -0.15, -0.9),
+      new THREE.Vector3(-0.2, -0.15, -0.9),
+      new THREE.Vector3(-0.2, 0.1, -0.9)
+    ];
+    const hudFrame = new THREE.Line(new THREE.BufferGeometry().setFromPoints(hudPts), hudLine);
+    this.add(hudFrame);
+    // HUD glass combiner
+    const hudGlass = new THREE.Mesh(new THREE.PlaneGeometry(0.38, 0.24), greenHUD);
+    hudGlass.position.set(0, -0.02, -0.9);
+    hudGlass.rotation.x = -0.15;
+    this.add(hudGlass);
+    // Three instruments: SPD, ALT, HDG
+    const instLabels = ['SPD', 'ALT', 'HDG'];
+    for (let i = 0; i < 3; i++) {
+      const x = -0.22 + i * 0.22;
+      const y = -0.47;
+      const inst = new THREE.Mesh(new THREE.CircleGeometry(0.055, 20), mat(0x050505));
+      inst.position.set(x, y, -0.97);
+      this.add(inst);
+      const rim = new THREE.Mesh(new THREE.RingGeometry(0.05, 0.058, 20), mat(0x444444, { metalness: 0.5 }));
+      rim.position.set(x, y, -0.968);
+      this.add(rim);
+      for (let t = 0; t < 10; t++) {
+        const a = (t / 10) * Math.PI * 2;
+        const tick = new THREE.Mesh(new THREE.BoxGeometry(0.002, 0.008, 0.001), mat(0x00ff44));
+        tick.position.set(x + Math.cos(a) * 0.042, y + Math.sin(a) * 0.042, -0.967);
+        this.add(tick);
+      }
+      const needle = this.makeNeedle(0.045, 0x00ff44);
+      needle.position.set(x, y, -0.966);
+      needle.name = 'needle_' + instLabels[i];
+      this.add(needle);
+    }
+    // Side stick (right side, stealth fighters use side stick)
+    const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.25, 6), metal);
+    stick.position.set(0.3, -0.55, -0.55);
+    stick.rotation.x = 0.1;
+    this.add(stick);
+    const stickGrip = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.04, 0.06), mat(0x222222));
+    stickGrip.position.set(0.3, -0.43, -0.57);
+    this.add(stickGrip);
+    // Throttle (left side)
+    const throttleBase = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.12), metal);
+    throttleBase.position.set(-0.4, -0.55, -0.6);
+    this.add(throttleBase);
+    const throttleLever = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.15, 5), mat(0x222222));
+    throttleLever.position.set(-0.4, -0.48, -0.6);
+    this.add(throttleLever);
+    // Angular canopy frame (gold-tinted)
+    const frameMat = mat(0x444444);
+    const topFrame = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.02, 0.02), frameMat);
+    topFrame.position.set(0, 0.35, -0.8);
+    this.add(topFrame);
+    for (let s = -1; s <= 1; s += 2) {
+      const sideFrame = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.6, 0.02), frameMat);
+      sideFrame.position.set(s * 0.4, 0.05, -0.8);
+      sideFrame.rotation.z = s * 0.15;
+      this.add(sideFrame);
+    }
+    // Gold-tinted canopy glass
+    const canopy = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.7), canopyGlass);
+    canopy.position.set(0, 0.1, -0.85);
+    canopy.rotation.x = -0.1;
+    this.add(canopy);
+    // Rudder pedals
+    for (let s = -1; s <= 1; s += 2) {
+      const pedal = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.025, 0.1), metal);
+      pedal.position.set(s * 0.14, -0.68, -0.8);
+      pedal.rotation.x = 0.25;
+      this.add(pedal);
+    }
+    // Ejection seat
+    const seatBase = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.05, 0.4), mat(0x222222));
+    seatBase.position.set(0, -0.66, 0.05);
+    this.add(seatBase);
+    const seatBack = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.5, 0.06), mat(0x1a1a1a));
+    seatBack.position.set(0, -0.4, 0.25);
+    seatBack.rotation.x = 0.1;
+    this.add(seatBack);
+    // Ejection handle (yellow/black striped)
+    const ejectHandle = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.025, 0.04), mat(0xffcc00));
+    ejectHandle.position.set(0, -0.68, -0.15);
+    this.add(ejectHandle);
+  }
+  buildF14(mat) {
+    const gray = mat(0x555555);
+    const darkPanel = mat(0x111111);
+    const metal = mat(0x888888, { metalness: 0.5 });
+    const canopyGlass = mat(0xaaddff, { transparent: true, opacity: 0.12 });
+    const greenHUD = mat(0x00ff44, { emissive: 0x00ff44, emissiveIntensity: 0.5, transparent: true, opacity: 0.25 });
+    const hudLine = new THREE.LineBasicMaterial({ color: 0x00ff44, transparent: true, opacity: 0.6 });
+    const greenGlow = mat(0x00ff44, { emissive: 0x00ff44, emissiveIntensity: 0.3 });
+    // Cabin walls
+    for (let s = -1; s <= 1; s += 2) {
+      const wall = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.5, 1.5), gray);
+      wall.position.set(s * 0.65, -0.4, -0.2);
+      this.add(wall);
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.03, 1.3), mat(0x444444));
+      rail.position.set(s * 0.63, -0.15, -0.2);
+      this.add(rail);
+    }
+    // Floor
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.03, 1.4), mat(0x333333));
+    floor.position.set(0, -0.7, -0.2);
+    this.add(floor);
+    // Main instrument panel
+    const dash = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.4, 0.06), darkPanel);
+    dash.position.set(0, -0.48, -1.05);
+    this.add(dash);
+    const dashTop = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.03, 0.1), mat(0x333333));
+    dashTop.position.set(0, -0.27, -1.0);
+    this.add(dashTop);
+    // HUD frame
+    const hudPts = [
+      new THREE.Vector3(-0.22, 0.12, -0.95),
+      new THREE.Vector3(0.22, 0.12, -0.95),
+      new THREE.Vector3(0.22, -0.12, -0.95),
+      new THREE.Vector3(-0.22, -0.12, -0.95),
+      new THREE.Vector3(-0.22, 0.12, -0.95)
+    ];
+    const hudFrame = new THREE.Line(new THREE.BufferGeometry().setFromPoints(hudPts), hudLine);
+    this.add(hudFrame);
+    const hudGlass = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.22), greenHUD);
+    hudGlass.position.set(0, 0.0, -0.95);
+    hudGlass.rotation.x = -0.12;
+    this.add(hudGlass);
+    // Six instruments: SPD, ALT, HDG (top), VSI, TURN, RPM (bottom)
+    const instNames = [['SPD','ALT','HDG'],['VSI','TURN','RPM']];
+    for (let r = 0; r < 2; r++) {
+      for (let c = 0; c < 3; c++) {
+        const x = -0.22 + c * 0.22;
+        const y = -0.45 + r * 0.17;
+        const inst = new THREE.Mesh(new THREE.CircleGeometry(0.058, 20), mat(0x080808));
+        inst.position.set(x, y, -1.02);
+        this.add(inst);
+        const rim = new THREE.Mesh(new THREE.RingGeometry(0.053, 0.061, 20), mat(0x999999, { metalness: 0.6 }));
+        rim.position.set(x, y, -1.018);
+        this.add(rim);
+        for (let t = 0; t < 12; t++) {
+          const angle = (t / 12) * Math.PI * 2;
+          const tick = new THREE.Mesh(new THREE.BoxGeometry(0.002, t % 3 === 0 ? 0.01 : 0.006, 0.001), mat(0xffffff));
+          tick.position.set(x + Math.cos(angle) * 0.046, y + Math.sin(angle) * 0.046, -1.017);
+          tick.rotation.z = angle;
+          this.add(tick);
+        }
+        const needle = this.makeNeedle(0.046, 0xff4400);
+        needle.position.set(x, y, -1.016);
+        needle.name = 'needle_' + instNames[r][c];
+        this.add(needle);
+      }
+    }
+    // Mach display (small green-tinted screen right of instruments)
+    const machBox = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.06, 0.01), darkPanel);
+    machBox.position.set(0.5, -0.38, -1.02);
+    this.add(machBox);
+    const machScreen = new THREE.Mesh(new THREE.PlaneGeometry(0.08, 0.04), mat(0x001100, { emissive: 0x002200, emissiveIntensity: 0.3 }));
+    machScreen.position.set(0.5, -0.38, -1.015);
+    this.add(machScreen);
+    // Radar scope (small green-tinted circular screen, lower right)
+    const radarRim = new THREE.Mesh(new THREE.RingGeometry(0.04, 0.048, 16), mat(0x555555, { metalness: 0.5 }));
+    radarRim.position.set(0.5, -0.55, -1.02);
+    this.add(radarRim);
+    const radarScreen = new THREE.Mesh(new THREE.CircleGeometry(0.04, 16), mat(0x001a00, { emissive: 0x003300, emissiveIntensity: 0.4 }));
+    radarScreen.position.set(0.5, -0.55, -1.018);
+    this.add(radarScreen);
+    // Radar sweep line
+    const sweepGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0.035, 0)
+    ]);
+    const radarSweep = new THREE.Line(sweepGeo, new THREE.LineBasicMaterial({ color: 0x00ff44 }));
+    radarSweep.position.set(0.5, -0.55, -1.016);
+    this.add(radarSweep);
+    // Center stick with grip
+    const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.3, 6), metal);
+    stick.position.set(0, -0.52, -0.6);
+    stick.rotation.x = 0.1;
+    this.add(stick);
+    const stickGrip = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.05, 0.055), mat(0x222222));
+    stickGrip.position.set(0, -0.37, -0.63);
+    this.add(stickGrip);
+    // Trigger on stick
+    const trigger = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.025, 0.015), metal);
+    trigger.position.set(0, -0.39, -0.66);
+    this.add(trigger);
+    // Twin throttle levers (left side)
+    const throttleBase = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.04, 0.15), mat(0x1a1a1a));
+    throttleBase.position.set(-0.5, -0.58, -0.65);
+    this.add(throttleBase);
+    for (let i = 0; i < 2; i++) {
+      const lever = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.18, 5), mat(0x333333));
+      lever.position.set(-0.48 + i * 0.04, -0.48, -0.65);
+      this.add(lever);
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.014, 6, 4), mat(0x222222));
+      knob.position.set(-0.48 + i * 0.04, -0.39, -0.65);
+      this.add(knob);
+    }
+    // Canopy bow frame overhead
+    const bowFrame = mat(0x555555);
+    const bow = new THREE.Mesh(new THREE.TorusGeometry(0.65, 0.015, 6, 16, Math.PI), bowFrame);
+    bow.position.set(0, 0.2, -0.5);
+    bow.rotation.x = Math.PI;
+    bow.rotation.z = Math.PI;
+    this.add(bow);
+    // Canopy side frames
+    for (let s = -1; s <= 1; s += 2) {
+      const sideFrame = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.8, 0.02), bowFrame);
+      sideFrame.position.set(s * 0.6, 0.1, -0.6);
+      sideFrame.rotation.z = s * 0.12;
+      this.add(sideFrame);
+    }
+    // Glass panels
+    for (let s = -1; s <= 1; s += 2) {
+      const pane = new THREE.Mesh(new THREE.PlaneGeometry(0.58, 0.8), canopyGlass);
+      pane.position.set(s * 0.3, 0.15, -0.98);
+      this.add(pane);
+    }
+    // Rudder pedals
+    for (let s = -1; s <= 1; s += 2) {
+      const pedal = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.03, 0.12), metal);
+      pedal.position.set(s * 0.15, -0.68, -0.85);
+      pedal.rotation.x = 0.25;
+      this.add(pedal);
+    }
+    // Ejection seat
+    const seatBase = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.05, 0.42), mat(0x333333));
+    seatBase.position.set(0, -0.66, 0.05);
+    this.add(seatBase);
+    const seatBack = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.55, 0.06), mat(0x222222));
+    seatBack.position.set(0, -0.38, 0.26);
+    seatBack.rotation.x = 0.1;
+    this.add(seatBack);
+    // Ejection handle
+    const ejectHandle = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.025, 0.04), mat(0xffcc00));
+    ejectHandle.position.set(0, -0.66, -0.18);
+    this.add(ejectHandle);
+  }
 }
 
 // ─── AircraftModels ───
@@ -1777,6 +2050,8 @@ class AircraftModels {
     this.models[2] = this.buildGlider();
     this.models[3] = this.buildParaglider();
     this.models[4] = this.buildHangGlider();
+    this.models[5] = this.buildF117();
+    this.models[6] = this.buildF14();
     Object.values(this.models).forEach(m => { m.visible = false; this.scene.add(m); });
   }
   show(index) {
@@ -1797,6 +2072,33 @@ class AircraftModels {
     if (!this.currentModel) return;
     const prop = this.currentModel.getObjectByName('propeller');
     if (prop) prop.rotation.z += dt * 40;
+  }
+  updateAfterburner(dt, throttle, aircraft) {
+    if (!this.currentModel) return;
+    const abNames = ['afterburner', 'afterburner_L', 'afterburner_R'];
+    for (const name of abNames) {
+      const ab = this.currentModel.getObjectByName(name);
+      if (!ab) continue;
+      if (!aircraft.hasAfterburner || throttle < 0.10) {
+        ab.visible = false;
+        continue;
+      }
+      ab.visible = true;
+      if (throttle > 0.85) {
+        // Full afterburner — big flaming effect with flickering
+        const pulse = 0.9 + 0.3 * Math.sin(Date.now() * 0.015);
+        const flicker = 0.95 + 0.1 * Math.sin(Date.now() * 0.047);
+        ab.scale.set(pulse * flicker, pulse * flicker, 1.0 + 0.2 * Math.sin(Date.now() * 0.02));
+        ab.material.emissiveIntensity = 2.0 * pulse;
+        ab.material.opacity = 0.85;
+      } else {
+        // Low/mid throttle — small dim exhaust glow
+        const t = (throttle - 0.10) / 0.75; // 0 to 1 over 10-85% range
+        ab.scale.set(0.3 + t * 0.4, 0.3 + t * 0.4, 0.3 + t * 0.3);
+        ab.material.emissiveIntensity = 0.3 + t * 0.7;
+        ab.material.opacity = 0.3 + t * 0.3;
+      }
+    }
   }
   buildBiplane() {
     const group = new THREE.Group();
@@ -2209,6 +2511,246 @@ class AircraftModels {
     group.scale.setScalar(0.55);
     return group;
   }
+  buildF117() {
+    const group = new THREE.Group();
+    const mat = (color, opts={}) => new THREE.MeshStandardMaterial({ color, roughness: 0.5, ...opts });
+    const black = mat(0x1a1a1a);
+    const darkGray = mat(0x222222);
+    const canopyMat = mat(0xaa8833, { transparent: true, opacity: 0.4, metalness: 0.3 });
+    const metal = mat(0x333333, { metalness: 0.5 });
+    // Faceted fuselage — flat wedge shape
+    const fuseShape = new THREE.Shape();
+    fuseShape.moveTo(0, -0.3);
+    fuseShape.lineTo(-0.9, -0.15);
+    fuseShape.lineTo(-0.7, 0.2);
+    fuseShape.lineTo(0, 0.35);
+    fuseShape.lineTo(0.7, 0.2);
+    fuseShape.lineTo(0.9, -0.15);
+    fuseShape.closePath();
+    const fuseGeo = new THREE.ExtrudeGeometry(fuseShape, { depth: 5.5, bevelEnabled: false });
+    const fuse = new THREE.Mesh(fuseGeo, black);
+    fuse.rotation.x = Math.PI / 2;
+    fuse.position.set(0, 0, -2.5);
+    group.add(fuse);
+    // Nose cone — angular pyramid
+    const noseGeo = new THREE.ConeGeometry(0.6, 2.5, 4);
+    const nose = new THREE.Mesh(noseGeo, black);
+    nose.rotation.x = -Math.PI / 2;
+    nose.rotation.y = Math.PI / 4;
+    nose.position.set(0, 0, -3.8);
+    group.add(nose);
+    // Canopy — small angular gold-tinted
+    const canopyGeo = new THREE.BoxGeometry(0.6, 0.25, 0.9);
+    const canopy = new THREE.Mesh(canopyGeo, canopyMat);
+    canopy.position.set(0, 0.4, -1.8);
+    group.add(canopy);
+    const canopyFrame = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.02, 0.95), darkGray);
+    canopyFrame.position.set(0, 0.52, -1.8);
+    group.add(canopyFrame);
+    // Highly swept delta wings
+    for (let s = -1; s <= 1; s += 2) {
+      const wingShape = new THREE.Shape();
+      wingShape.moveTo(0, 0);
+      wingShape.lineTo(s * 5.5, 0);
+      wingShape.lineTo(s * 2, -3.5);
+      wingShape.lineTo(0, -1);
+      wingShape.closePath();
+      const wingGeo = new THREE.ShapeGeometry(wingShape);
+      wingGeo.rotateX(-Math.PI / 2);
+      const wing = new THREE.Mesh(wingGeo, new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.5, side: THREE.DoubleSide }));
+      wing.position.set(0, -0.1, 0.5);
+      group.add(wing);
+    }
+    // V-tail — two angled stabilizers
+    for (let s = -1; s <= 1; s += 2) {
+      const tailGeo = new THREE.BoxGeometry(1.8, 0.08, 1.2);
+      const tail = new THREE.Mesh(tailGeo, black);
+      tail.position.set(s * 1.2, 0.5, 2.8);
+      tail.rotation.z = s * 0.55;
+      group.add(tail);
+    }
+    // Flat rectangular exhaust slot
+    const exhaustSlot = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.2, 0.3), darkGray);
+    exhaustSlot.position.set(0, -0.05, 3.0);
+    group.add(exhaustSlot);
+    const exhaustInner = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.12, 0.15), mat(0x111111));
+    exhaustInner.position.set(0, -0.05, 3.1);
+    group.add(exhaustInner);
+    // Afterburner flame cone
+    const abGeo = new THREE.ConeGeometry(0.3, 2.5, 8);
+    const abMat = new THREE.MeshStandardMaterial({ color: 0xff6600, emissive: 0xff4400, emissiveIntensity: 1.5, transparent: true, opacity: 0.8 });
+    const afterburner = new THREE.Mesh(abGeo, abMat);
+    afterburner.rotation.x = Math.PI / 2;
+    afterburner.position.set(0, -0.05, 4.3);
+    afterburner.name = 'afterburner';
+    afterburner.visible = false;
+    group.add(afterburner);
+    // Tricycle landing gear
+    // Nose gear
+    const noseGearLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.8, 5), metal);
+    noseGearLeg.position.set(0, -0.7, -2.5);
+    group.add(noseGearLeg);
+    const noseWheel = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.07, 8, 10), mat(0x222222));
+    noseWheel.position.set(0, -1.1, -2.5);
+    noseWheel.rotation.y = Math.PI / 2;
+    group.add(noseWheel);
+    // Main gear
+    for (let s = -1; s <= 1; s += 2) {
+      const mainLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.9, 5), metal);
+      mainLeg.position.set(s * 1.2, -0.75, 0.5);
+      group.add(mainLeg);
+      const mainWheel = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.08, 8, 10), mat(0x222222));
+      mainWheel.position.set(s * 1.2, -1.2, 0.5);
+      mainWheel.rotation.y = Math.PI / 2;
+      group.add(mainWheel);
+    }
+    group.scale.setScalar(0.55);
+    return group;
+  }
+  buildF14() {
+    const group = new THREE.Group();
+    const mat = (color, opts={}) => new THREE.MeshStandardMaterial({ color, roughness: 0.45, ...opts });
+    const gray = mat(0x999999);
+    const darkGray = mat(0x555555);
+    const accent = mat(0x444444);
+    const metal = mat(0x666666, { metalness: 0.5 });
+    const canopyGlass = mat(0xaaddff, { transparent: true, opacity: 0.25 });
+    // Long sleek fuselage
+    const fuseMain = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.85, 7, 10), gray);
+    fuseMain.rotation.x = Math.PI / 2;
+    group.add(fuseMain);
+    const fuseTail = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.7, 4, 8), gray);
+    fuseTail.rotation.x = Math.PI / 2;
+    fuseTail.position.set(0, 0, 4.5);
+    group.add(fuseTail);
+    // Nose cone
+    const noseCone = new THREE.Mesh(new THREE.ConeGeometry(0.55, 3, 10), gray);
+    noseCone.rotation.x = -Math.PI / 2;
+    noseCone.position.set(0, 0, -5);
+    group.add(noseCone);
+    // Radome tip
+    const radome = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.8, 8), darkGray);
+    radome.rotation.x = -Math.PI / 2;
+    radome.position.set(0, 0, -6.8);
+    group.add(radome);
+    // Tandem two-seat bubble canopy
+    const canopyBase = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.1, 2.5), accent);
+    canopyBase.position.set(0, 0.7, -2.5);
+    group.add(canopyBase);
+    const canopyFront = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), canopyGlass);
+    canopyFront.position.set(0, 0.72, -3.0);
+    canopyFront.scale.set(0.9, 0.6, 1.2);
+    group.add(canopyFront);
+    const canopyRear = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.5), canopyGlass);
+    canopyRear.position.set(0, 0.72, -2.0);
+    canopyRear.scale.set(0.9, 0.6, 1.0);
+    group.add(canopyRear);
+    // Canopy frame bow
+    const canopyBow = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.04, 0.06), accent);
+    canopyBow.position.set(0, 0.95, -2.5);
+    group.add(canopyBow);
+    // Wing gloves (fixed inner wing sections)
+    for (let s = -1; s <= 1; s += 2) {
+      const glove = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.14, 2.8), gray);
+      glove.position.set(s * 1.8, -0.1, -0.2);
+      group.add(glove);
+    }
+    // Swept-back variable-sweep wings
+    for (let s = -1; s <= 1; s += 2) {
+      const wingShape = new THREE.Shape();
+      wingShape.moveTo(0, 0);
+      wingShape.lineTo(s * 4.5, 0.5);
+      wingShape.lineTo(s * 4.0, -1.5);
+      wingShape.lineTo(0, -1.5);
+      wingShape.closePath();
+      const wingGeo = new THREE.ShapeGeometry(wingShape);
+      wingGeo.rotateX(-Math.PI / 2);
+      const wing = new THREE.Mesh(wingGeo, new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 0.45, side: THREE.DoubleSide }));
+      wing.position.set(s * 2.8, -0.1, -0.3);
+      group.add(wing);
+    }
+    // Twin vertical tails
+    for (let s = -1; s <= 1; s += 2) {
+      const tailV = new THREE.Mesh(new THREE.BoxGeometry(0.08, 2.0, 1.8), gray);
+      tailV.position.set(s * 0.9, 1.2, 5.5);
+      group.add(tailV);
+      // Rudder hinge line
+      const rudderLine = new THREE.Mesh(new THREE.BoxGeometry(0.02, 1.8, 0.03), darkGray);
+      rudderLine.position.set(s * 0.9, 1.2, 6.2);
+      group.add(rudderLine);
+    }
+    // Horizontal stabilizer
+    const hStab = new THREE.Mesh(new THREE.BoxGeometry(5.5, 0.08, 1.5), gray);
+    hStab.position.set(0, 0.1, 5.8);
+    group.add(hStab);
+    // Large box intakes on fuselage sides
+    for (let s = -1; s <= 1; s += 2) {
+      const intake = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.9, 2.5), darkGray);
+      intake.position.set(s * 1.2, -0.2, -1.5);
+      group.add(intake);
+      const intakeInner = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.7, 0.1), mat(0x111111));
+      intakeInner.position.set(s * 1.2, -0.2, -2.75);
+      group.add(intakeInner);
+      // Intake ramp
+      const ramp = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.06, 2.4), accent);
+      ramp.position.set(s * 1.2, 0.25, -1.5);
+      group.add(ramp);
+    }
+    // Twin engine nacelles
+    for (let s = -1; s <= 1; s += 2) {
+      const nacelle = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.5, 5, 8), darkGray);
+      nacelle.rotation.x = Math.PI / 2;
+      nacelle.position.set(s * 1.0, -0.1, 3.5);
+      group.add(nacelle);
+      // Exhaust nozzle
+      const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.5, 0.6, 10), mat(0x333333, { metalness: 0.6 }));
+      nozzle.rotation.x = Math.PI / 2;
+      nozzle.position.set(s * 1.0, -0.1, 6.1);
+      group.add(nozzle);
+      const nozzleInner = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.42, 0.3, 10), mat(0x111111));
+      nozzleInner.rotation.x = Math.PI / 2;
+      nozzleInner.position.set(s * 1.0, -0.1, 6.3);
+      group.add(nozzleInner);
+      // Afterburner flame cone
+      const abGeo = new THREE.ConeGeometry(0.35, 3, 8);
+      const abMat = new THREE.MeshStandardMaterial({ color: 0xff6600, emissive: 0xff4400, emissiveIntensity: 1.5, transparent: true, opacity: 0.8 });
+      const ab = new THREE.Mesh(abGeo, abMat);
+      ab.rotation.x = Math.PI / 2;
+      ab.position.set(s * 1.0, -0.1, 7.8);
+      ab.name = s === -1 ? 'afterburner_L' : 'afterburner_R';
+      ab.visible = false;
+      group.add(ab);
+    }
+    // Navy-style markings — tail stripe
+    for (let s = -1; s <= 1; s += 2) {
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.6, 0.15), mat(0xff8800));
+      stripe.position.set(s * 0.9, 1.2, 5.0);
+      group.add(stripe);
+    }
+    // Wing root stripe
+    const wingStripe = new THREE.Mesh(new THREE.BoxGeometry(2, 0.02, 0.15), mat(0xdddddd));
+    wingStripe.position.set(0, 0.05, -1.0);
+    group.add(wingStripe);
+    // Tricycle landing gear
+    const noseGearLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.0, 5), metal);
+    noseGearLeg.position.set(0, -0.9, -3.5);
+    group.add(noseGearLeg);
+    const noseWheel = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.08, 8, 10), mat(0x222222));
+    noseWheel.position.set(0, -1.4, -3.5);
+    noseWheel.rotation.y = Math.PI / 2;
+    group.add(noseWheel);
+    for (let s = -1; s <= 1; s += 2) {
+      const mainLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 1.1, 5), metal);
+      mainLeg.position.set(s * 1.5, -0.95, 0);
+      group.add(mainLeg);
+      const mainWheel = new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.09, 8, 10), mat(0x222222));
+      mainWheel.position.set(s * 1.5, -1.5, 0);
+      mainWheel.rotation.y = Math.PI / 2;
+      group.add(mainWheel);
+    }
+    group.scale.setScalar(0.55);
+    return group;
+  }
 }
 
 // ─── AirstripSystem ───
@@ -2449,6 +2991,7 @@ class FlightPhysics {
     this.thermals = [];
     this.crashed = false;
     this.godMode = false;
+    this.onGround = false;
     this.generateThermals();
   }
   generateThermals() {
@@ -2479,22 +3022,30 @@ class FlightPhysics {
     const ac = this.aircraft;
     // Input
     const pitchInput = (input.pitch || 0) * ac.pitchRate;
-    const rollInput = (input.roll || 0) * ac.rollRate;
-    // Apply rotations
+    const acIndex = AIRCRAFT.indexOf(ac);
+    const isParagliderOrHangGlider = (acIndex === 3 || acIndex === 4);
+    // Ground steering: left/right = yaw turn when on ground at low speed
+    if (this.onGround && this.speed < 30 && !isParagliderOrHangGlider && input.roll !== 0) {
+      const steerRate = 1.5 * (1 - this.speed / 40);
+      const steerQ = new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(0, 1, 0), input.roll * steerRate * dt
+      );
+      this.quaternion.premultiply(steerQ);
+    } else {
+      // Normal roll
+      const rollInput = (input.roll || 0) * ac.rollRate;
+      const rollQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, -1), rollInput * dt);
+      this.quaternion.multiply(rollQ);
+    }
+    // Apply pitch
     const pitchQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), pitchInput * dt);
-    const rollQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, -1), rollInput * dt);
     this.quaternion.multiply(pitchQ);
-    this.quaternion.multiply(rollQ);
     // Yaw from bank (turn coordination)
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.quaternion);
     const bankAngle = Math.asin(Math.max(-1, Math.min(1, -right.y)));
     const yawRate = -bankAngle * ac.yawRate * (this.speed / 30);
     const yawQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yawRate * dt);
     this.quaternion.premultiply(yawQ);
-    // Auto-level
-    if (input.autoLevel) {
-      this.quaternion.slerp(this.getLevelQuat(), 2 * dt);
-    }
     // Thrust and drag
     if (ac.hasEngine) {
       this.throttle = Math.max(0, Math.min(1, this.throttle + (input.throttleDir || 0) * dt));
@@ -2543,6 +3094,7 @@ class FlightPhysics {
     if (this.position.y < minAlt) {
       if (this.godMode) {
         // God mode: bounce
+        this.onGround = true;
         this.position.y = minAlt + 2;
         if (forward.y < -0.1) {
           this.speed *= 0.95;
@@ -2553,26 +3105,44 @@ class FlightPhysics {
         const pitchAngle = Math.abs(this.getPitch());
         const bankAngle = Math.abs(this.getRoll());
         const onRunway = airstrips ? airstrips.isOnRunway(this.position.x, this.position.z) : false;
-        const isGentle = this.speed < 18 && pitchAngle < 0.25 && bankAngle < 0.3;
-        const isSafeLanding = onRunway && this.speed < 30 && pitchAngle < 0.35 && bankAngle < 0.5;
+        // Jets land faster — scale safe speed with aircraft max speed
+        const safeLandSpeed = Math.max(18, ac.maxSpeed * 0.15);
+        const safeRunwaySpeed = Math.max(30, ac.maxSpeed * 0.25);
+        const isGentle = this.speed < safeLandSpeed && pitchAngle < 0.25 && bankAngle < 0.3;
+        const isSafeLanding = onRunway && this.speed < safeRunwaySpeed && pitchAngle < 0.35 && bankAngle < 0.5;
         if (isGentle || isSafeLanding) {
           // Safe touchdown — slide along surface
+          this.onGround = true;
           this.position.y = minAlt;
           this.speed *= 0.98;
           this.quaternion.slerp(this.getLevelQuat(), 3 * dt);
-        } else if (this.speed > 15 || pitchAngle > 0.52 || bankAngle > 1.05) {
+          // Spacebar brakes (not for paraglider/hang glider)
+          if (input.brake && !isParagliderOrHangGlider) {
+            this.speed *= 0.92;
+            if (this.speed < 0.5) this.speed = 0;
+          }
+        } else if (this.speed > safeLandSpeed * 0.83 || pitchAngle > 0.52 || bankAngle > 1.05) {
           // Crash!
           this.crashed = true;
+          this.onGround = true;
           this.position.y = minAlt;
           this.speed = 0;
           return;
         } else {
           // Low-speed bump
+          this.onGround = true;
           this.position.y = minAlt;
           this.speed *= 0.95;
           this.quaternion.slerp(this.getLevelQuat(), 5 * dt);
+          // Brakes also work on bumps
+          if (input.brake && !isParagliderOrHangGlider) {
+            this.speed *= 0.92;
+            if (this.speed < 0.5) this.speed = 0;
+          }
         }
       }
+    } else {
+      this.onGround = false;
     }
   }
   updateMovementOnly(dt, terrain, airstrips) {
@@ -2680,7 +3250,7 @@ class InputController {
   }
   onKeyDown(e) {
     this.keys[e.code] = true;
-    if (e.code >= 'Digit1' && e.code <= 'Digit5') {
+    if (e.code >= 'Digit1' && e.code <= 'Digit7') {
       if (this.onAircraftSwitch) this.onAircraftSwitch(parseInt(e.code.slice(5)) - 1);
     }
     if (e.code === 'Escape') {
@@ -2695,14 +3265,14 @@ class InputController {
   }
   onKeyUp(e) { this.keys[e.code] = false; }
   update() {
-    this.pitch = 0; this.roll = 0; this.throttleDir = 0; this.autoLevel = false;
+    this.pitch = 0; this.roll = 0; this.throttleDir = 0; this.autoLevel = false; this.brake = false;
     if (this.keys['ArrowUp']) this.pitch = -1;
     if (this.keys['ArrowDown']) this.pitch = 1;
     if (this.keys['ArrowLeft']) this.roll = -1;
     if (this.keys['ArrowRight']) this.roll = 1;
     if (this.keys['KeyW'] || this.keys['ShiftLeft'] || this.keys['ShiftRight']) this.throttleDir = 1;
     if (this.keys['KeyS'] || this.keys['ControlLeft'] || this.keys['ControlRight']) this.throttleDir = -1;
-    if (this.keys['Space']) this.autoLevel = true;
+    if (this.keys['Space']) this.brake = true;
     // Decay mouse look
     this.mouseX *= 0.96;
     this.mouseY *= 0.96;
@@ -3395,6 +3965,7 @@ class App {
       // Update aircraft model transform
       this.aircraftModels.updateTransform(this.physics.position, this.physics.quaternion);
       this.aircraftModels.updatePropeller(dt);
+      this.aircraftModels.updateAfterburner(dt, this.physics.throttle, this.physics.aircraft);
     }
     // Update systems
     const px = this.physics.position.x, pz = this.physics.position.z;
