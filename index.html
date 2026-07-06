@@ -45,6 +45,8 @@ canvas#main{display:block;width:100vw;height:100vh}
 #menu-box .close-hint{margin-top:16px;font-size:11px;color:#00ff8866}
 #controls-panel{position:fixed;top:12px;left:12px;z-index:15;background:rgba(0,20,10,0.55);border:1px solid #00ff8833;border-radius:6px;padding:8px 12px;font-family:'Courier New',monospace;font-size:11px;color:#00ff8899;line-height:1.6;pointer-events:none;text-shadow:0 0 4px #00ff8844}
 #controls-panel span{color:#00ffaa;font-weight:bold}
+#version-stamp{position:fixed;bottom:8px;right:10px;z-index:20;font-family:'Courier New',monospace;font-size:10px;color:#00ff8866;pointer-events:none;text-shadow:0 0 4px #00ff8833}
+#version-stamp .joy{color:#00ffaa}
 #crash-overlay{position:fixed;top:0;left:0;width:100%;height:100%;display:none;align-items:center;justify-content:center;z-index:200;background:rgba(0,0,0,0.7);flex-direction:column}
 #crash-overlay.active{display:flex}
 #crash-overlay h1{font-family:'Courier New',monospace;font-size:72px;color:#ff3333;text-shadow:0 0 30px #ff000088,0 0 60px #ff000044;margin-bottom:20px}
@@ -147,7 +149,8 @@ canvas#main{display:block;width:100vw;height:100vh}
   <span>W/⇧</span> Thr+ &nbsp;<span>S/Ctrl</span> Thr-<br>
   <span>Space</span> Brake &nbsp;<span>V</span> View<br>
   <span>G</span> God Mode &nbsp;<span>R</span> Reset<br>
-  <span>A</span> AutoPilot &nbsp;<span>1-7</span> Aircraft
+  <span>A</span> AutoPilot &nbsp;<span>1-7</span> Aircraft<br>
+  <span>🕹</span> Joystick auto-detected
 </div>
 <div id="crash-overlay">
   <h1>CRASHED</h1>
@@ -157,6 +160,7 @@ canvas#main{display:block;width:100vw;height:100vh}
 <div id="godmode-indicator">GOD MODE</div>
 <div id="autopilot-indicator">AUTOPILOT</div>
 <button id="view-btn">V: Cockpit</button>
+<div id="version-stamp"></div>
 <script type="importmap">
 {
   "imports": {
@@ -175,6 +179,9 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const VERSION = 'v01.1.0';
+const BUILD = '2026-07-06 13:00 PT';
 
 // ─── NoiseGenerator ───
 class NoiseGenerator {
@@ -3207,11 +3214,13 @@ class FlightPhysics {
     const pitchInput = (input.pitch || 0) * ac.pitchRate;
     const acIndex = AIRCRAFT.indexOf(ac);
     const isParagliderOrHangGlider = (acIndex === 3 || acIndex === 4);
-    // Ground steering: left/right = yaw turn when on ground at low speed
-    if (this.onGround && this.speed < 30 && !isParagliderOrHangGlider && input.roll !== 0) {
+    // Ground steering: left/right (or rudder twist) = yaw turn when on ground at low speed
+    const steerInput = Math.max(-1, Math.min(1, (input.roll || 0) + (input.yaw || 0)));
+    if (this.onGround && this.speed < 30 && !isParagliderOrHangGlider && steerInput !== 0) {
       const steerRate = 1.5 * (1 - this.speed / 40);
+      // Negative: positive world-Y rotation turns left, so steer right needs the sign flipped
       const steerQ = new THREE.Quaternion().setFromAxisAngle(
-        new THREE.Vector3(0, 1, 0), input.roll * steerRate * dt
+        new THREE.Vector3(0, 1, 0), -steerInput * steerRate * dt
       );
       this.quaternion.premultiply(steerQ);
     } else {
@@ -3229,9 +3238,21 @@ class FlightPhysics {
     const yawRate = -bankAngle * ac.yawRate * (this.speed / 30);
     const yawQ = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yawRate * dt);
     this.quaternion.premultiply(yawQ);
+    // Rudder (joystick twist) in the air: body-axis yaw, twist right = nose right
+    if (!this.onGround && input.yaw) {
+      const rudderQ = new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(0, 1, 0), -input.yaw * ac.yawRate * 0.6 * dt
+      );
+      this.quaternion.multiply(rudderQ);
+    }
     // Thrust and drag
     if (ac.hasEngine) {
-      this.throttle = Math.max(0, Math.min(1, this.throttle + (input.throttleDir || 0) * dt));
+      if (input.throttleAbs != null) {
+        // Joystick throttle slider sets power directly
+        this.throttle = input.throttleAbs;
+      } else {
+        this.throttle = Math.max(0, Math.min(1, this.throttle + (input.throttleDir || 0) * dt));
+      }
       const thrustForce = ac.thrust * this.throttle;
       this.speed += thrustForce * dt;
     }
@@ -3419,7 +3440,9 @@ class InputController {
     this.keys = {};
     this.pitch = 0;
     this.roll = 0;
+    this.yaw = 0;
     this.throttleDir = 0;
+    this.throttleAbs = null;
     this.autoLevel = false;
     this.mouseX = 0;
     this.mouseY = 0;
@@ -3432,8 +3455,37 @@ class InputController {
     this.onGodModeToggle = null;
     this.onReset = null;
     this.onAutopilotToggle = null;
+    // Joystick (Gamepad API) — default mapping is for Microsoft SideWinder Precision 2.
+    // A saved mapping from joystick_test page (localStorage 'if_joy_map_v1') overrides it.
+    this.gamepadIndex = null;
+    this.joyName = '';
+    this.prevJoyButtons = [];
+    this.joyMap = {
+      axes: { roll: {i:0, s:1}, pitch: {i:1, s:1}, yaw: {i:2, s:1}, throttle: {i:3, s:-1} },
+      hat: { i: 9 },
+      buttons: { brake: 0, autopilot: 1, view: 2, reset: 3 },
+      deadzone: 0.08,
+      expo: 0.3
+    };
+    try {
+      const saved = localStorage.getItem('if_joy_map_v1');
+      if (saved) this.joyMap = Object.assign(this.joyMap, JSON.parse(saved));
+    } catch (e) { /* keep defaults */ }
+    window.addEventListener('gamepadconnected', e => {
+      this.gamepadIndex = e.gamepad.index;
+      this.joyName = e.gamepad.id;
+      this.updateJoyIndicator(true);
+    });
+    window.addEventListener('gamepaddisconnected', e => {
+      if (e.gamepad.index === this.gamepadIndex) {
+        this.gamepadIndex = null;
+        this.throttleAbs = null;
+        this.updateJoyIndicator(false);
+      }
+    });
     window.addEventListener('keydown', e => this.onKeyDown(e));
     window.addEventListener('keyup', e => this.onKeyUp(e));
+    this.updateJoyIndicator(false);
     canvas.addEventListener('click', () => {
       if (!this.isLocked) canvas.requestPointerLock();
     });
@@ -3465,8 +3517,71 @@ class InputController {
     if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
   }
   onKeyUp(e) { this.keys[e.code] = false; }
+  updateJoyIndicator(connected) {
+    const el = document.getElementById('version-stamp');
+    if (!el) return;
+    const joy = connected ? ` · <span class="joy">🕹 ${this.joyName.split('(')[0].trim().slice(0, 28)}</span>` : '';
+    el.innerHTML = `${VERSION} · ${BUILD}${joy}`;
+  }
+  // Deadzone + expo curve: gentle near center, full authority at the stops
+  shapeAxis(v) {
+    const dz = this.joyMap.deadzone;
+    if (Math.abs(v) < dz) return 0;
+    const n = (Math.abs(v) - dz) / (1 - dz);
+    const ex = this.joyMap.expo;
+    const shaped = (1 - ex) * n + ex * n * n * n;
+    return Math.sign(v) * Math.min(1, shaped);
+  }
+  pollJoystick() {
+    // Discover sticks that were already plugged in before the page loaded
+    // (Safari only exposes them after a button press — that's by design)
+    if (this.gamepadIndex === null && navigator.getGamepads) {
+      for (const p of navigator.getGamepads()) {
+        if (p) { this.gamepadIndex = p.index; this.joyName = p.id; this.updateJoyIndicator(true); break; }
+      }
+    }
+    if (this.gamepadIndex === null) { this.throttleAbs = null; return; }
+    const gp = navigator.getGamepads()[this.gamepadIndex];
+    if (!gp) { this.throttleAbs = null; return; }
+    const m = this.joyMap;
+    const ax = (spec) => {
+      const raw = gp.axes[spec.i];
+      return raw === undefined ? 0 : raw * spec.s;
+    };
+    const roll = this.shapeAxis(ax(m.axes.roll));
+    const pitch = this.shapeAxis(ax(m.axes.pitch));
+    const yaw = this.shapeAxis(ax(m.axes.yaw));
+    // Stick overrides keyboard when deflected; keyboard still works as backup
+    if (roll !== 0) this.roll = roll;
+    if (pitch !== 0) this.pitch = pitch;
+    this.yaw = yaw;
+    // Throttle slider is absolute: mapped +1 = full power → 0..1
+    if (m.axes.throttle && gp.axes[m.axes.throttle.i] !== undefined) {
+      this.throttleAbs = Math.max(0, Math.min(1, (ax(m.axes.throttle) + 1) / 2));
+    }
+    // Hat switch → look around (feeds the same decaying mouse-look values)
+    if (m.hat && gp.axes[m.hat.i] !== undefined) {
+      const hv = gp.axes[m.hat.i];
+      if (hv >= -1.01 && hv <= 1.01) {
+        const dir = Math.round((hv + 1) / (2 / 7)); // 0=up,1=up-right,2=right...7=up-left
+        const lookX = [0, 1, 1, 1, 0, -1, -1, -1][dir] || 0;
+        const lookY = [-1, -1, 0, 1, 1, 1, 0, -1][dir] || 0;
+        this.mouseX = Math.max(-1.2, Math.min(1.2, this.mouseX + lookX * 0.08));
+        this.mouseY = Math.max(-0.8, Math.min(0.8, this.mouseY + lookY * 0.05));
+      }
+    }
+    // Buttons: brake is held; the rest fire on press (edge detection)
+    const pressed = (idx) => !!(gp.buttons[idx] && gp.buttons[idx].pressed);
+    if (pressed(m.buttons.brake)) this.brake = true;
+    const edges = [['view', this.onViewToggle], ['reset', this.onReset], ['autopilot', this.onAutopilotToggle]];
+    for (const [name, cb] of edges) {
+      const idx = m.buttons[name];
+      if (idx !== undefined && pressed(idx) && !this.prevJoyButtons[idx] && cb) cb();
+    }
+    this.prevJoyButtons = gp.buttons.map(b => b.pressed);
+  }
   update() {
-    this.pitch = 0; this.roll = 0; this.throttleDir = 0; this.autoLevel = false; this.brake = false;
+    this.pitch = 0; this.roll = 0; this.yaw = 0; this.throttleDir = 0; this.autoLevel = false; this.brake = false;
     if (this.keys['ArrowUp']) this.pitch = -1;
     if (this.keys['ArrowDown']) this.pitch = 1;
     if (this.keys['ArrowLeft']) this.roll = -1;
@@ -3474,6 +3589,9 @@ class InputController {
     if (this.keys['KeyW'] || this.keys['ShiftLeft'] || this.keys['ShiftRight']) this.throttleDir = 1;
     if (this.keys['KeyS'] || this.keys['ControlLeft'] || this.keys['ControlRight']) this.throttleDir = -1;
     if (this.keys['Space']) this.brake = true;
+    this.pollJoystick();
+    // Keyboard throttle keys take back control from the slider while held
+    if (this.throttleDir !== 0) this.throttleAbs = null;
     // Decay mouse look
     this.mouseX *= 0.96;
     this.mouseY *= 0.96;
