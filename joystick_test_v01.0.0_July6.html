@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>InfiniteFlight Joystick Test</title>
+<style>
+  body{background:#0a1420;color:#cfe8ff;font-family:'Courier New',monospace;margin:0;padding:24px;max-width:900px;margin:0 auto}
+  h1{color:#00ffaa;font-size:22px}
+  .ver{color:#4a6a8a;font-size:11px}
+  .card{background:#0f1e30;border:1px solid #1e3a5f;border-radius:8px;padding:16px;margin:14px 0}
+  .waiting{color:#ffb020;font-size:18px;padding:30px;text-align:center}
+  .axis-row{display:flex;align-items:center;gap:10px;margin:6px 0}
+  .axis-label{width:80px;color:#7fb0d8}
+  .bar{flex:1;height:18px;background:#08101c;border:1px solid #1e3a5f;border-radius:4px;position:relative;overflow:hidden}
+  .fill{position:absolute;top:0;bottom:0;background:#00ffaa;opacity:0.7}
+  .center-line{position:absolute;left:50%;top:0;bottom:0;width:1px;background:#3a5a7a}
+  .axis-val{width:70px;text-align:right;color:#00ffaa}
+  .btns{display:flex;flex-wrap:wrap;gap:8px}
+  .btn-light{width:44px;height:44px;border-radius:6px;background:#08101c;border:1px solid #1e3a5f;display:flex;align-items:center;justify-content:center;color:#4a6a8a}
+  .btn-light.on{background:#00ffaa;color:#04121c;border-color:#00ffaa;font-weight:bold}
+  #wizard{border-color:#00ffaa55}
+  #wiz-step{font-size:20px;color:#ffd060;margin:10px 0;min-height:52px}
+  #wiz-progress{color:#7fb0d8;font-size:12px}
+  button{background:#1e3a5f;color:#cfe8ff;border:1px solid #3a5a7a;border-radius:6px;padding:10px 18px;font-family:inherit;font-size:14px;cursor:pointer;margin-right:8px}
+  button:hover{background:#2a4a72}
+  button.primary{background:#00aa77;border-color:#00ffaa;color:#04121c;font-weight:bold}
+  #result-json{background:#08101c;border:1px solid #1e3a5f;border-radius:6px;padding:12px;white-space:pre-wrap;font-size:12px;color:#9fd0a0;display:none}
+  .ok{color:#00ffaa}
+  .note{color:#7fb0d8;font-size:12px;line-height:1.5}
+</style>
+</head>
+<body>
+<h1>🕹 InfiniteFlight Joystick Test &amp; Calibration</h1>
+<div class="ver">v01.0.0 - 2026-07-06 13:00 PT</div>
+
+<div class="card note">
+  Plug in the joystick, then <b>press any button or wiggle the stick</b> so the browser detects it
+  (Safari and Chrome hide joysticks until you touch one, for privacy).
+  Once you see the bars move, click <b>Start Calibration</b> and follow the prompts.
+  The saved profile is picked up automatically by the simulator (same browser).
+</div>
+
+<div id="no-pad" class="card waiting">Waiting for joystick... press a button on it now.</div>
+
+<div id="pad-card" class="card" style="display:none">
+  <div id="pad-name" class="ok"></div>
+  <div id="axes"></div>
+  <div style="margin-top:12px;color:#7fb0d8">Buttons:</div>
+  <div id="buttons" class="btns"></div>
+</div>
+
+<div id="wizard" class="card" style="display:none">
+  <div id="wiz-progress"></div>
+  <div id="wiz-step">Click Start Calibration to map your stick.</div>
+  <button id="wiz-start" class="primary">Start Calibration</button>
+  <button id="wiz-skip" style="display:none">Skip this step</button>
+  <button id="wiz-cancel" style="display:none">Cancel</button>
+  <div id="result-json"></div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let padIndex = null;
+let baseline = null;
+
+// ---- Wizard state ----
+// Each axis step: prompt, key. Detection: axis whose |value - baseline| > 0.75 held ~400ms.
+// Sign is stored so that mapped value = raw * s gives +1 in the prompted direction.
+const AXIS_STEPS = [
+  { key: 'roll',     prompt: 'Push the stick fully RIGHT and hold it there.' },
+  { key: 'pitch',    prompt: 'Pull the stick fully BACK (toward you) and hold.' },
+  { key: 'yaw',      prompt: 'TWIST the stick grip fully RIGHT (rudder) and hold.' },
+  { key: 'throttle', prompt: 'Push the THROTTLE slider all the way FORWARD (full power) and hold.' },
+];
+const HAT_STEP = { key: 'hat', prompt: 'Push the HAT switch (top of stick) to the RIGHT and hold. Or Skip if none.' };
+const BUTTON_STEPS = [
+  { key: 'brake',     prompt: 'Press the button you want for BRAKES (usually the trigger).' },
+  { key: 'view',      prompt: 'Press the button you want for VIEW toggle (cockpit/chase).' },
+  { key: 'reset',     prompt: 'Press the button you want for RESET after a crash.' },
+  { key: 'autopilot', prompt: 'Press the button you want for AUTOPILOT. Or Skip.' },
+];
+let wiz = null; // {steps, idx, mapping, holdStart, usedAxes, usedButtons, prevButtons}
+
+function freshMapping() {
+  return { version: 1, name: '', axes: {}, hat: null,
+           buttons: {}, deadzone: 0.08, expo: 0.3 };
+}
+
+function startWizard() {
+  const gp = navigator.getGamepads()[padIndex];
+  if (!gp) return;
+  baseline = { axes: gp.axes.slice(), buttons: gp.buttons.map(b => b.pressed) };
+  wiz = {
+    steps: [...AXIS_STEPS, HAT_STEP, ...BUTTON_STEPS],
+    idx: 0, mapping: freshMapping(), holdStart: null,
+    usedAxes: new Set(), usedButtons: new Set(),
+  };
+  wiz.mapping.name = gp.id;
+  $('wiz-start').style.display = 'none';
+  $('wiz-skip').style.display = '';
+  $('wiz-cancel').style.display = '';
+  $('result-json').style.display = 'none';
+  showStep();
+}
+
+function showStep() {
+  const total = wiz.steps.length;
+  $('wiz-progress').textContent = `Step ${wiz.idx + 1} of ${total}`;
+  $('wiz-step').textContent = wiz.steps[wiz.idx].prompt;
+}
+
+function advance(found) {
+  const step = wiz.steps[wiz.idx];
+  if (found) $('wiz-step').textContent = `✓ ${step.key} captured`;
+  wiz.idx++;
+  wiz.holdStart = null;
+  // Re-baseline so the next step's detection is relative to a re-centered stick.
+  setTimeout(() => {
+    const gp = navigator.getGamepads()[padIndex];
+    if (gp) baseline = { axes: gp.axes.slice(), buttons: gp.buttons.map(b => b.pressed) };
+    if (wiz && wiz.idx < wiz.steps.length) showStep(); else if (wiz) finishWizard();
+  }, 900);
+}
+
+function finishWizard() {
+  const m = wiz.mapping;
+  localStorage.setItem('if_joy_map_v1', JSON.stringify(m));
+  $('wiz-progress').textContent = 'Done!';
+  $('wiz-step').innerHTML = '<span class="ok">✓ Calibration saved.</span> The simulator will use this profile automatically. Profile JSON below (for reference):';
+  $('wiz-skip').style.display = 'none';
+  $('wiz-cancel').style.display = 'none';
+  $('wiz-start').style.display = '';
+  $('wiz-start').textContent = 'Re-calibrate';
+  const rj = $('result-json');
+  rj.style.display = 'block';
+  rj.textContent = JSON.stringify(m, null, 2);
+  wiz = null;
+}
+
+function cancelWizard() {
+  wiz = null;
+  $('wiz-step').textContent = 'Calibration cancelled.';
+  $('wiz-skip').style.display = 'none';
+  $('wiz-cancel').style.display = 'none';
+  $('wiz-start').style.display = '';
+}
+
+$('wiz-start').addEventListener('click', startWizard);
+$('wiz-cancel').addEventListener('click', cancelWizard);
+$('wiz-skip').addEventListener('click', () => { if (wiz) advance(false); });
+
+function wizardTick(gp) {
+  if (!wiz || wiz.idx >= wiz.steps.length) return;
+  const step = wiz.steps[wiz.idx];
+  const now = performance.now();
+
+  if (AXIS_STEPS.includes(step)) {
+    // Find the axis that moved furthest from baseline (ignoring already-mapped axes
+    // and idle hat axes, which rest outside the -1..1 range)
+    let best = -1, bestDelta = 0;
+    for (let i = 0; i < gp.axes.length; i++) {
+      if (wiz.usedAxes.has(i)) continue;
+      if (Math.abs(baseline.axes[i]) > 1.05) continue;
+      const d = Math.abs(gp.axes[i] - baseline.axes[i]);
+      if (d > bestDelta) { bestDelta = d; best = i; }
+    }
+    if (best >= 0 && bestDelta > 0.75 && Math.abs(gp.axes[best]) > 0.5) {
+      if (wiz.holdStart === null) { wiz.holdStart = now; wiz.holdAxis = best; }
+      else if (wiz.holdAxis !== best) { wiz.holdStart = now; wiz.holdAxis = best; }
+      else if (now - wiz.holdStart > 400) {
+        wiz.mapping.axes[step.key] = { i: best, s: Math.sign(gp.axes[best]) || 1 };
+        wiz.usedAxes.add(best);
+        advance(true);
+      }
+    } else { wiz.holdStart = null; }
+
+  } else if (step === HAT_STEP) {
+    // A hat axis rests outside -1..1 and snaps into range when pressed
+    for (let i = 0; i < gp.axes.length; i++) {
+      if (wiz.usedAxes.has(i)) continue;
+      const wasIdle = Math.abs(baseline.axes[i]) > 1.05;
+      const nowActive = Math.abs(gp.axes[i]) <= 1.01;
+      if (wasIdle && nowActive) {
+        wiz.mapping.hat = { i };
+        wiz.usedAxes.add(i);
+        advance(true);
+        return;
+      }
+    }
+
+  } else {
+    // Button step: first newly-pressed, not-yet-used button wins
+    for (let i = 0; i < gp.buttons.length; i++) {
+      if (wiz.usedButtons.has(i)) continue;
+      if (gp.buttons[i].pressed && !baseline.buttons[i]) {
+        wiz.mapping.buttons[step.key] = i;
+        wiz.usedButtons.add(i);
+        advance(true);
+        return;
+      }
+    }
+  }
+}
+
+// ---- Live display ----
+function render() {
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  let gp = null;
+  if (padIndex !== null) gp = pads[padIndex];
+  if (!gp) { for (const p of pads) if (p) { gp = p; padIndex = p.index; break; } }
+
+  if (!gp) {
+    $('no-pad').style.display = '';
+    $('pad-card').style.display = 'none';
+    $('wizard').style.display = 'none';
+  } else {
+    $('no-pad').style.display = 'none';
+    $('pad-card').style.display = '';
+    $('wizard').style.display = '';
+    $('pad-name').textContent = `Connected: ${gp.id}  (index ${gp.index}, ${gp.axes.length} axes, ${gp.buttons.length} buttons)`;
+
+    const axesDiv = $('axes');
+    if (axesDiv.children.length !== gp.axes.length) {
+      axesDiv.innerHTML = gp.axes.map((_, i) =>
+        `<div class="axis-row"><div class="axis-label">axis ${i}</div>` +
+        `<div class="bar"><div class="center-line"></div><div class="fill" id="ax-fill-${i}"></div></div>` +
+        `<div class="axis-val" id="ax-val-${i}"></div></div>`).join('');
+    }
+    gp.axes.forEach((v, i) => {
+      const fill = $(`ax-fill-${i}`);
+      const clamped = Math.max(-1, Math.min(1, v));
+      if (clamped >= 0) { fill.style.left = '50%'; fill.style.width = (clamped * 50) + '%'; }
+      else { fill.style.left = (50 + clamped * 50) + '%'; fill.style.width = (-clamped * 50) + '%'; }
+      $(`ax-val-${i}`).textContent = v.toFixed(3);
+    });
+
+    const btnDiv = $('buttons');
+    if (btnDiv.children.length !== gp.buttons.length) {
+      btnDiv.innerHTML = gp.buttons.map((_, i) => `<div class="btn-light" id="bt-${i}">${i}</div>`).join('');
+    }
+    gp.buttons.forEach((b, i) => $(`bt-${i}`).classList.toggle('on', b.pressed));
+
+    wizardTick(gp);
+  }
+  requestAnimationFrame(render);
+}
+
+window.addEventListener('gamepaddisconnected', e => { if (e.gamepad.index === padIndex) padIndex = null; });
+requestAnimationFrame(render);
+</script>
+</body>
+</html>
