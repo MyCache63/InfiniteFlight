@@ -47,6 +47,8 @@ canvas#main{display:block;width:100vw;height:100vh}
 #controls-panel span{color:#00ffaa;font-weight:bold}
 #version-stamp{position:fixed;bottom:8px;right:10px;z-index:20;font-family:'Courier New',monospace;font-size:10px;color:#00ff8866;pointer-events:none;text-shadow:0 0 4px #00ff8833}
 #version-stamp .joy{color:#00ffaa}
+#version-stamp .cal{color:#00ffaa;border:1px solid #00ffaa;border-radius:3px;padding:0 3px;font-size:9px}
+#version-stamp .nocal{color:#ffcc44;border:1px solid #ffcc44;border-radius:3px;padding:0 3px;font-size:9px}
 #crash-overlay{position:fixed;top:0;left:0;width:100%;height:100%;display:none;align-items:center;justify-content:center;z-index:200;background:rgba(0,0,0,0.7);flex-direction:column}
 #crash-overlay.active{display:flex}
 #crash-overlay h1{font-family:'Courier New',monospace;font-size:72px;color:#ff3333;text-shadow:0 0 30px #ff000088,0 0 60px #ff000044;margin-bottom:20px}
@@ -180,8 +182,8 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
-const VERSION = 'v01.1.0';
-const BUILD = '2026-07-06 13:00 PT';
+const VERSION = 'v01.2.0';
+const BUILD = '2026-07-30 08:42 PT';
 
 // ─── NoiseGenerator ───
 class NoiseGenerator {
@@ -3460,6 +3462,7 @@ class InputController {
     this.gamepadIndex = null;
     this.joyName = '';
     this.prevJoyButtons = [];
+    this.customMap = false;  // true once a saved calibration profile is loaded
     this.joyMap = {
       axes: { roll: {i:0, s:1}, pitch: {i:1, s:1}, yaw: {i:2, s:1}, throttle: {i:3, s:-1} },
       hat: { i: 9 },
@@ -3469,7 +3472,10 @@ class InputController {
     };
     try {
       const saved = localStorage.getItem('if_joy_map_v1');
-      if (saved) this.joyMap = Object.assign(this.joyMap, JSON.parse(saved));
+      if (saved) {
+        this.joyMap = Object.assign(this.joyMap, JSON.parse(saved));
+        this.customMap = true;
+      }
     } catch (e) { /* keep defaults */ }
     window.addEventListener('gamepadconnected', e => {
       this.gamepadIndex = e.gamepad.index;
@@ -3520,7 +3526,11 @@ class InputController {
   updateJoyIndicator(connected) {
     const el = document.getElementById('version-stamp');
     if (!el) return;
-    const joy = connected ? ` · <span class="joy">🕹 ${this.joyName.split('(')[0].trim().slice(0, 28)}</span>` : '';
+    // Show which mapping is live: CAL = your saved calibration, DEFAULT = built-in guess.
+    const cal = this.customMap
+      ? ` <span class="cal">CAL</span>`
+      : ` <span class="nocal">DEFAULT MAP</span>`;
+    const joy = connected ? ` · <span class="joy">🕹 ${this.joyName.split('(')[0].trim().slice(0, 28)}</span>${cal}` : '';
     el.innerHTML = `${VERSION} · ${BUILD}${joy}`;
   }
   // Deadzone + expo curve: gentle near center, full authority at the stops
