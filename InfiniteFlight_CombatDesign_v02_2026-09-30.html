@@ -1,0 +1,362 @@
+<title>InfiniteFlight Strike Design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a single reading column styled like an aeronautical sectional chart, with a scorer and a decision checklist */
+:root{
+  --bg:#eef3f6; --paper:#ffffff; --ink:#15232e; --muted:#566a78; --rule:#cfdbe3;
+  --magenta:#a3226f; --blue:#1f5f99; --good:#23794a; --warn:#a86a00; --bad:#b0303a;
+  --chip:#e3edf3;
+  --display:"Barlow Condensed","Arial Narrow",sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d1720; --paper:#14212c; --ink:#e3ecf2; --muted:#93a7b6; --rule:#263a49;
+  --magenta:#e0609f; --blue:#6fa8dc; --good:#5cc48a; --warn:#e3a53a; --bad:#ec6a72; --chip:#1c2e3c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d1720; --paper:#14212c; --ink:#e3ecf2; --muted:#93a7b6; --rule:#263a49;
+  --magenta:#e0609f; --blue:#6fa8dc; --good:#5cc48a; --warn:#e3a53a; --bad:#ec6a72; --chip:#1c2e3c; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font:16px/1.6 var(--body)}
+.wrap{max-width:62rem;margin:0 auto;padding-inline:16px;padding-block:28px 64px;display:grid;gap:40px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.1}
+h1{font-size:clamp(2.2rem,5vw,3.3rem);font-weight:700;letter-spacing:.01em}
+h2{font-size:1.9rem;font-weight:600;color:var(--blue)}
+h3{font-size:1.3rem;font-weight:600}
+p{margin:0;max-width:65ch}
+.eyebrow{font:500 .78rem var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--magenta)}
+section{display:grid;gap:16px}
+.hero{display:grid;gap:14px}
+.verdict{background:var(--paper);border:1px solid var(--rule);border-left:4px solid var(--magenta);padding:18px 20px;display:grid;gap:8px}
+.verdict strong{font-family:var(--display);font-size:1.45rem;font-weight:600}
+figure{margin:0;display:grid;gap:6px}
+figure img{border:1px solid var(--rule);display:block;width:100%}
+figcaption{font-size:.85rem;color:var(--muted)}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(18rem,1fr));gap:16px}
+.two>*{min-width:0}
+.col{background:var(--paper);border:1px solid var(--rule);padding:18px;display:grid;gap:10px;align-content:start}
+.col ul{margin:0;padding-left:1.1rem;display:grid;gap:8px}
+.col.pro h3{color:var(--good)} .col.con h3{color:var(--bad)}
+.tablewrap{overflow-x:auto;border:1px solid var(--rule);background:var(--paper)}
+table{border-collapse:collapse;width:100%;min-width:40rem;font-size:.93rem}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--rule);vertical-align:top}
+th{font:600 .78rem var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+td:first-child{font-weight:600;white-space:nowrap}
+.g{color:var(--good);font-weight:600}.w{color:var(--warn);font-weight:600}.b{color:var(--bad);font-weight:600}
+/* scorer */
+.scorer{display:grid;grid-template-columns:repeat(auto-fit,minmax(20rem,1fr));gap:20px;background:var(--paper);border:1px solid var(--rule);padding:18px}
+.scorer>*{min-width:0}
+.slider{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center}
+.slider label{font-size:.95rem}
+.slider output{font:500 .9rem var(--mono);color:var(--magenta);font-variant-numeric:tabular-nums}
+.slider input{grid-column:1/-1;width:100%;accent-color:var(--magenta)}
+.sliders{display:grid;gap:14px}
+.bars{display:grid;gap:12px;align-content:start}
+.bar{display:grid;gap:4px}
+.bar .top{display:flex;justify-content:space-between;gap:8px;font-size:.95rem}
+.bar .num{font:500 .9rem var(--mono);font-variant-numeric:tabular-nums}
+.track{height:12px;background:var(--chip);border-radius:2px;overflow:hidden}
+.fill{height:100%;background:var(--blue);transition:width .25s}
+.bar.lead .fill{background:var(--magenta)}
+.bar.lead .top span:first-child{font-weight:600}
+.note{font-size:.85rem;color:var(--muted)}
+/* decisions */
+.decisions{display:grid;gap:14px}
+.q{background:var(--paper);border:1px solid var(--rule);padding:16px 18px;display:grid;gap:10px}
+.q .why{font-size:.9rem;color:var(--muted)}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.opts label{display:flex;align-items:center;gap:6px;border:1px solid var(--rule);padding:6px 12px;border-radius:3px;cursor:pointer;font-size:.93rem;background:var(--bg)}
+.opts input{accent-color:var(--magenta)}
+.opts label:has(input:checked){border-color:var(--magenta);color:var(--magenta);font-weight:600}
+.opts label:focus-within{outline:2px solid var(--blue);outline-offset:2px}
+.summary{font:500 .95rem var(--mono);background:var(--chip);padding:12px 14px;border-radius:3px}
+button{font:600 .9rem var(--body);background:var(--magenta);color:var(--paper);border:0;padding:9px 16px;border-radius:3px;cursor:pointer}
+button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.diagram{overflow-x:auto;background:var(--paper);border:1px solid var(--rule);padding:12px}
+.diagram svg{min-width:40rem;width:100%;height:auto;display:block}
+.src{font-size:.85rem;color:var(--muted);display:grid;gap:4px;word-break:break-all}
+.src a{color:var(--blue)}
+.stamp{font:400 .78rem var(--mono);color:var(--muted)}
+@media (prefers-reduced-motion:reduce){.fill{transition:none}}
+/* additions for the design page */
+.pillars{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:14px}
+.pillars>div{background:var(--paper);border:1px solid var(--rule);padding:16px;display:grid;gap:6px;align-content:start;min-width:0}
+.pillars .src1{font-size:.82rem;color:var(--muted)}
+blockquote{margin:0;padding:10px 16px;border-left:3px solid var(--blue);background:var(--paper);font-style:italic;max-width:65ch}
+blockquote cite{display:block;font-style:normal;font-size:.82rem;color:var(--muted);margin-top:4px}
+.quotes{display:grid;gap:10px}
+.lab{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;background:var(--paper);border:1px solid var(--rule);padding:18px}
+@media (max-width:700px){.lab{grid-template-columns:1fr}}
+.lab svg{width:100%;height:auto;display:block}
+.call{font:600 1.4rem var(--display);color:var(--magenta)}
+.grade{font:500 .95rem var(--mono)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font:500 .8rem var(--mono);background:var(--chip);padding:4px 10px;border-radius:3px}
+.phase{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;background:var(--paper);border:1px solid var(--rule);padding:14px 16px}
+.phase .n{font:700 1.6rem var(--display);color:var(--magenta);grid-row:span 2}
+.phase p{font-size:.95rem}
+.phases{display:grid;gap:10px}
+.hudbox{background:#0b1a12;border:1px solid var(--rule);padding:8px}
+.hudbox svg{width:100%;height:auto;display:block;min-width:0}
+.assist{display:grid;gap:8px}
+.assist label{display:flex;gap:10px;align-items:center;font-size:.95rem}
+.assist input{accent-color:var(--magenta);width:18px;height:18px}
+.meter{height:14px;background:var(--chip);border-radius:2px;overflow:hidden}
+.meter div{height:100%;background:var(--magenta);transition:width .2s}
+</style>
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">InfiniteFlight · combat design · v02 · 2026-09-30 06:45 PT</div>
+  <h1>A modern JetFighter, built into InfiniteFlight</h1>
+  <p>This is a design for a browser combat mode that keeps what made the JetFighter series fun in the 1990s and fixes what reviewers complained about. It runs in Three.js, it works with your SideWinder, and it's playable on aiquorum.org.</p>
+  <div class="verdict">
+    <strong>The one-line pitch: fast, low, over real ground, from a carrier you actually have to trap on.</strong>
+    <p>Every JetFighter review praised the same thing, which was the feeling of speed near the ground. JetFighter IV was set over the San Francisco Bay Area and Lake Tahoe. InfiniteFlight already has SF Bay and real USGS Yosemite terrain, so the home theater is already half built.</p>
+  </div>
+</header>
+
+<section>
+  <div class="eyebrow">What the series was</div>
+  <h2>JetFighter, 1988 to 2000</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Title</th><th>Year</th><th>What it added</th><th>Computer Gaming World</th></tr></thead>
+    <tbody>
+      <tr><td>JetFighter: The Adventure</td><td>1988</td><td>Velocity's first PC jet sim, praised for the smoothest graphics of its day.</td><td>Not scored in my sources</td></tr>
+      <tr><td>JetFighter II</td><td>1990</td><td>It made carrier landings the headline feature, with a flyable F-14, F/A-18, F-16 and an ATF.</td><td>3.5 of 5</td></tr>
+      <tr><td>JetFighter III</td><td>1996</td><td>It had 3.5 million square miles of USGS terrain, 90+ branching missions, a carrier and wingmen.</td><td>4 of 5</td></tr>
+      <tr><td>Enhanced Campaign CD</td><td>1997</td><td>It added the F-14 with Phoenix missiles, Alaska and East Asia campaigns, flaps and an autopilot.</td><td>Not scored in my sources</td></tr>
+      <tr><td>JetFighter: Full Burn</td><td>1998</td><td>It added 3Dfx graphics, multiplayer for up to 16 players, and video cutscenes.</td><td>3.5 of 5</td></tr>
+      <tr><td>JetFighter IV: Fortress America</td><td>2000</td><td>It was set over the SF Bay Area and Tahoe, with photo terrain, but its multiplayer was cut before release.</td><td>2 of 5</td></tr>
+    </tbody>
+  </table></div>
+  <div class="quotes">
+    <blockquote>"Few flight sims can match the realistic, gut-level feeling of speed like JF3."<cite>Scott A. May, Computer Gaming World #152, March 1997</cite></blockquote>
+    <blockquote>"Fly low enough and you can even follow roads and power lines from village to village."<cite>Computer Gaming World #152, March 1997</cite></blockquote>
+    <blockquote>"The plane instantaneously goes wherever you push the stick." "Your wingman will quickly be shot down."<cite>Jeff Lackey, on JetFighter IV, Computer Gaming World #199, February 2001</cite></blockquote>
+  </div>
+  <p class="note">You can play JetFighter III Platinum in your browser at https://archive.org/details/msdos_JetFighter_III_Platinum_1999 and read its full manual at https://archive.org/details/jetfigher-3-rdf-handbook-v1.2 if you want a refresher.</p>
+</section>
+
+<section>
+  <div class="eyebrow">Design pillars</div>
+  <h2>Eight rules, each traced to a review</h2>
+  <div class="pillars">
+    <div><h3>1. Speed near the ground</h3><p>Dense ground detail, roads and rivers, strong motion cues and buffeting make 500 knots at 300 feet feel fast.</p><span class="src1">Every JF3 and Full Burn review praised this.</span></div>
+    <div><h3>2. Fights at visual range</h3><p>The enemy AI pulls you into turning fights. Missiles matter, but a gun kill is the fight people remember.</p><span class="src1">GameSpot liked JF3's close-in AI.</span></div>
+    <div><h3>3. A carrier you have to earn</h3><p>You get a catapult launch, a moving deck, a working meatball, LSO radio calls, a graded trap and bolters.</p><span class="src1">JF3 had the LSO only in its manual's story.</span></div>
+    <div><h3>4. Every jet feels different</h3><p>Each aircraft gets its own turn rate, energy loss, g limit and slow-speed manners.</p><span class="src1">All three later games were criticized for this.</span></div>
+    <div><h3>5. A campaign that reacts</h3><p>Missions branch on what you hit and what you lose, and enemy flights spawn differently each time.</p><span class="src1">JF IV's repeated scripted spawns were panned.</span></div>
+    <div><h3>6. Assists you choose</h3><p>Each realism setting is a separate switch, from auto-trap to full blackout and fuel limits.</p><span class="src1">JF3 did this well with its "Ease" options.</span></div>
+    <div><h3>7. Get flying in one click</h3><p>Instant action and a skip-the-flight-home option come standard. There's no walk-around carrier menu.</p><span class="src1">GameSpot called JF3's carrier menu a nuisance.</span></div>
+    <div><h3>8. Other people</h3><p>AIQuorum leaderboards and ghost replays come first, then live dogfights and a mission editor.</p><span class="src1">Multiplayer was the most missed feature.</span></div>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow">Try it: the carrier approach</div>
+  <h2>The meatball and the LSO</h2>
+  <p>On a real carrier approach you fly a glide slope of about 3.5 degrees at a fixed angle of attack. You watch an amber light, the "ball", against a row of green reference lights. Drag the slider to fly the approach high or low and see what the pilot sees and what the LSO says.</p>
+  <div class="lab">
+    <div style="display:grid;gap:12px">
+      <svg viewBox="0 0 300 170" aria-label="Fresnel lens landing aid">
+        <rect x="0" y="0" width="300" height="170" fill="var(--chip)"/>
+        <g fill="#2fd16b">
+          <circle cx="30" cy="85" r="7"/><circle cx="55" cy="85" r="7"/><circle cx="80" cy="85" r="7"/><circle cx="105" cy="85" r="7"/>
+          <circle cx="195" cy="85" r="7"/><circle cx="220" cy="85" r="7"/><circle cx="245" cy="85" r="7"/><circle cx="270" cy="85" r="7"/>
+        </g>
+        <rect x="130" y="15" width="40" height="140" fill="var(--paper)" stroke="var(--rule)"/>
+        <rect x="130" y="127" width="40" height="28" fill="#c0303a" opacity=".25"/>
+        <circle id="ball" cx="150" cy="85" r="11" fill="#ffb020"/>
+      </svg>
+      <label for="gs" class="note">Your height on the glide slope</label>
+      <input type="range" id="gs" min="-4" max="4" step="1" value="0" style="accent-color:var(--magenta);width:100%">
+      <div class="note" style="display:flex;justify-content:space-between"><span>Low</span><span>On glide slope</span><span>High</span></div>
+    </div>
+    <div style="display:grid;gap:10px;align-content:start">
+      <span class="eyebrow">LSO on the radio</span>
+      <div class="call" id="call">"Roger ball."</div>
+      <div class="grade" id="grade">Likely grade: OK, 3-wire</div>
+      <p class="note" id="explain">The ball is level with the green lights, so you're on the glide slope. Hold your angle of attack and don't flare. JetFighter III's manual said the same thing: "literally fly right into the deck!"</p>
+    </div>
+  </div>
+  <p class="note">This is simplified. In the game the ball will respond to your real height, the deck will pitch in the swell, and the LSO will grade every pass on a boarding board.</p>
+</section>
+
+<section>
+  <div class="eyebrow">Cockpit</div>
+  <h2>The combat HUD</h2>
+  <p>The HUD keeps JetFighter's simple approach so you can concentrate on flying. It shows the few things a fighter pilot needs: speed, altitude, heading, g, the target box and a gun funnel.</p>
+  <div class="hudbox" role="img" aria-label="Mockup of the combat heads-up display with a target box, gun funnel, pitch ladder and speed and altitude readouts">
+  <svg viewBox="0 0 640 360" font-family="IBM Plex Mono, monospace" font-size="14" fill="none" stroke="#39ff8a" stroke-width="1.5">
+    <rect x="0" y="0" width="640" height="360" fill="#0b1a12" stroke="none"/>
+    <g fill="#39ff8a" stroke="none">
+      <text x="30" y="40">340</text><text x="30" y="58" font-size="11">KTS</text>
+      <text x="560" y="40">4,850</text><text x="572" y="58" font-size="11">FT</text>
+      <text x="30" y="320">G 5.8</text><text x="30" y="338" font-size="11">MAX 7.5</text>
+      <text x="520" y="320">GUN 412</text><text x="520" y="338" font-size="11">AIM-9X 2</text>
+      <text x="300" y="30">270</text>
+    </g>
+    <path d="M200 40 H440 M230 40 v8 M260 40 v8 M290 40 v8 M350 40 v8 M380 40 v8 M410 40 v8"/>
+    <path d="M318 46 l2 8 2 -8"/>
+    <g transform="rotate(-18 320 180)">
+      <path d="M210 150 H280 M360 150 H430 M210 150 v8 M430 150 v8"/>
+      <path d="M230 210 h20 M260 210 h20 M360 210 h20 M390 210 h20"/>
+      <path d="M180 180 H290 M350 180 H460"/>
+    </g>
+    <path d="M305 180 h10 l5 6 5 -6 h10 M320 186 v8"/>
+    <rect x="410" y="95" width="46" height="46" stroke="#39ff8a"/>
+    <path d="M372 250 C 380 200, 400 160, 424 132 M336 250 C 350 200, 380 150, 420 118" stroke-dasharray="4 4"/>
+    <g fill="#39ff8a" stroke="none"><text x="462" y="112" font-size="12">MiG-29</text><text x="462" y="128" font-size="12">1.2 NM</text></g>
+    <circle cx="433" cy="118" r="30" stroke="#39ff8a" stroke-dasharray="2 6"/>
+  </svg>
+  </div>
+  <p class="note">This is a mockup. The dashed lines are the gun funnel, which shows where your bullets will be when they reach the target's range.</p>
+</section>
+
+<section>
+  <div class="eyebrow">Content</div>
+  <h2>Aircraft, weapons and missions</h2>
+  <div class="two">
+    <div class="col">
+      <h3>Aircraft you fly</h3>
+      <ul>
+        <li>The F/A-18E Super Hornet is the carrier workhorse and the best first jet.</li>
+        <li>The F-14 Tomcat is already in the sim and gets swing wings and the Phoenix missile.</li>
+        <li>The F-35C is the modern stealth jet and flies from the carrier.</li>
+        <li>The F-22 flies from airfields and has thrust vectoring and supercruise, like JF3's F-22N.</li>
+        <li>The F-117 is already in the sim and handles night strike missions.</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h3>What you fight</h3>
+      <ul>
+        <li>Enemy fighters include the MiG-29, Su-27, Su-35, Su-57 and J-20, each with its own AI skill level.</li>
+        <li>Ground threats include flak guns, SAM sites and ships that shoot back.</li>
+        <li>Targets include airfields, bridges, radar sites, convoys and a carrier group.</li>
+      </ul>
+      <h3>Weapons</h3>
+      <div class="chips"><span class="chip">M61 gun</span><span class="chip">AIM-9X</span><span class="chip">AIM-120</span><span class="chip">AIM-54</span><span class="chip">Mk-82 / Mk-84 with CCIP</span><span class="chip">Laser-guided bombs</span><span class="chip">Maverick</span><span class="chip">Harpoon</span><span class="chip">Chaff and flares</span></div>
+    </div>
+  </div>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Mode</th><th>What you do</th><th>How it's scored</th></tr></thead>
+    <tbody>
+      <tr><td>Carrier quals</td><td>You fly six day traps, then six at night.</td><td>LSO grade and wire caught</td></tr>
+      <tr><td>Instant dogfight</td><td>You pick 1 v 1 up to 2 v 4, guns only or missiles, and the enemy's skill.</td><td>Kills, time and damage taken</td></tr>
+      <tr><td>Strike run</td><td>You fly low through a valley, bomb a target and get home.</td><td>Hits, time and exposure to SAMs</td></tr>
+      <tr><td>Intercept</td><td>You scramble from the deck to stop bombers heading for the Bay.</td><td>Bombers stopped before the line</td></tr>
+      <tr><td>Tanker hookup</td><td>You refuel from a tanker in the air, which no JetFighter game had.</td><td>Time to connect and fuel taken</td></tr>
+      <tr><td>Campaign</td><td>You defend Northern California from a fictional coalition, across 30 to 40 branching missions.</td><td>The front line moves with your results</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="eyebrow">Realism</div>
+  <h2>Assist switches</h2>
+  <p>Tick the assists you'd want on. The meter shows how close to a real jet the result feels.</p>
+  <div class="lab">
+    <div class="assist" id="assists"></div>
+    <div style="display:grid;gap:10px;align-content:start">
+      <span class="eyebrow">Realism</span>
+      <div class="meter"><div id="rm"></div></div>
+      <div class="call" id="rl">Full realism</div>
+      <p class="note">Each switch goes on the leaderboard with your score, so a no-assist trap is worth more than an auto-trap.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow">How we'd build it</div>
+  <h2>Build order</h2>
+  <p>Each step is playable on its own, so you can fly and give feedback after every one. The session counts are my estimates.</p>
+  <div class="phases">
+    <div class="phase"><span class="n">1</span><h3>Flight model and the stick (2 to 3 sessions)</h3><p>This is Phase 2 of the current plan: angle of attack, stall, g limits, blackout, and a different envelope for each jet. It comes first because every later step depends on it.</p></div>
+    <div class="phase"><span class="n">2</span><h3>The carrier (2 to 3 sessions)</h3><p>This adds a moving carrier off the Golden Gate, catapult launches, the meatball, the arresting wires, bolters, LSO calls and grades.</p></div>
+    <div class="phase"><span class="n">3</span><h3>Sound (1 session)</h3><p>This adds the engine, wind rush, the gun, missile launches, radio calls, and the warning tone when an enemy radar locks you.</p></div>
+    <div class="phase"><span class="n">4</span><h3>Guns-only dogfight (2 to 3 sessions)</h3><p>This adds one enemy jet with a turning-fight AI, bullets, hits, damage and a padlock view.</p></div>
+    <div class="phase"><span class="n">5</span><h3>Missiles, radar and countermeasures (2 sessions)</h3><p>This adds a radar display, lock-on, Sidewinder and AMRAAM guidance, chaff and flares, and wingmen with attack, follow and hold commands.</p></div>
+    <div class="phase"><span class="n">6</span><h3>Strike missions (2 sessions)</h3><p>This adds bombs with CCIP, ground targets, flak and SAM sites.</p></div>
+    <div class="phase"><span class="n">7</span><h3>Campaign and leaderboards (3 sessions)</h3><p>This adds branching missions, the moving front line, AIQuorum scores and ghost replays.</p></div>
+    <div class="phase"><span class="n">8</span><h3>Live multiplayer and a mission editor (later)</h3><p>This needs a WebSocket server on AIQuorum, so it waits until the rest is proven.</p></div>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow">Your decisions</div>
+  <h2>Seven questions before I start</h2>
+  <p>The page remembers your choices in this browser. Click "Copy my answers" at the bottom and paste them back to me.</p>
+  <div class="decisions" id="decisions"></div>
+  <div><button id="copy" type="button">Copy my answers</button> <span class="note" id="copied"></span></div>
+</section>
+
+<section class="src">
+  <div class="eyebrow">Sources checked on 2026-09-30</div>
+  <span>JetFighter III manual (full scan and text): <a href="https://archive.org/details/jetfigher-3-rdf-handbook-v1.2">https://archive.org/details/jetfigher-3-rdf-handbook-v1.2</a></span>
+  <span>JetFighter III Platinum, playable in the browser: <a href="https://archive.org/details/msdos_JetFighter_III_Platinum_1999">https://archive.org/details/msdos_JetFighter_III_Platinum_1999</a></span>
+  <span>CGW #152, JetFighter III review: <a href="https://www.cgwmuseum.org/galleries/issues/cgw_152.pdf">https://www.cgwmuseum.org/galleries/issues/cgw_152.pdf</a></span>
+  <span>CGW #172, Full Burn review: <a href="https://www.cgwmuseum.org/galleries/issues/cgw_172.pdf">https://www.cgwmuseum.org/galleries/issues/cgw_172.pdf</a></span>
+  <span>CGW #199, JetFighter IV review: <a href="https://www.cgwmuseum.org/galleries/issues/cgw_199.pdf">https://www.cgwmuseum.org/galleries/issues/cgw_199.pdf</a></span>
+  <span>GameSpot, JetFighter III: <a href="https://www.gamespot.com/reviews/jetfighter-iii-review/1900-2535585/">https://www.gamespot.com/reviews/jetfighter-iii-review/1900-2535585/</a></span>
+  <span>GameSpot, Enhanced Campaign CD: <a href="https://www.gamespot.com/reviews/jetfighter-iii-enhanced-campaign-cd-review/1900-2535576/">https://www.gamespot.com/reviews/jetfighter-iii-enhanced-campaign-cd-review/1900-2535576/</a></span>
+  <span>GameSpot, JetFighter IV: <a href="https://www.gamespot.com/reviews/jetfighter-iv-fortress-america-review/1900-2654162/">https://www.gamespot.com/reviews/jetfighter-iv-fortress-america-review/1900-2654162/</a></span>
+  <span>Combatsim, JetFighter III: <a href="https://www.combatsim.com/printer.php?action=review&amp;id=275&amp;page=1">https://www.combatsim.com/printer.php?action=review&amp;id=275&amp;page=1</a></span>
+  <span>Series overview: <a href="https://en.wikipedia.org/wiki/Jetfighter_(series)">https://en.wikipedia.org/wiki/Jetfighter_(series)</a></span>
+  <span class="stamp">InfiniteFlight combat design v02 · 2026-09-30 06:45 PT</span>
+</section>
+</div>
+
+<script>
+(function(){
+  function load(k,d){try{var v=localStorage.getItem(k);return v===null?d:JSON.parse(v)}catch(e){return d}}
+  function save(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+
+  // Meatball: each step is roughly a quarter degree off the glide slope (simplified)
+  var calls={
+    "-4":['"Wave off! Wave off!"',"Wave-off, no grade","The ball is red at the bottom of the lens. You're dangerously low and must go around at full power."],
+    "-3":['"Power! Power!"',"Likely grade: No grade, 1-wire or ramp strike","The ball is well below the green lights. You're low and slow to the ramp."],
+    "-2":['"You\'re low."',"Likely grade: Fair, 1-wire","The ball is below the green lights. Add a little power to climb back onto the glide slope."],
+    "-1":['"A little power."',"Likely grade: OK, 2-wire","The ball is just below center. A small power correction brings it back."],
+    "0":['"Roger ball."',"Likely grade: OK, 3-wire","The ball is level with the green lights, so you're on the glide slope. Hold your angle of attack and don't flare. JetFighter III's manual said the same thing: \"literally fly right into the deck!\""],
+    "1":['"Easy with it."',"Likely grade: OK, 3 or 4-wire","The ball is just above center. Ease the power off slightly."],
+    "2":['"You\'re high."',"Likely grade: Fair, 4-wire","The ball is above the green lights. You'll catch the last wire or miss them all."],
+    "3":['"You\'re high, don\'t go low."',"Likely grade: Bolter likely","You're well high. A big correction now risks a hard hit on the ramp, so fix it gently or go around."],
+    "4":['"Bolter, bolter, bolter."',"Bolter, no grade","The ball is off the top of the lens. Your hook misses every wire, so you go around at full power."]
+  };
+  var gs=document.getElementById("gs"),ball=document.getElementById("ball");
+  function fly(){var v=gs.value,c=calls[v];ball.setAttribute("cy",85-v*16);ball.setAttribute("fill",v<=-4?"#e0303a":"#ffb020");
+    document.getElementById("call").textContent=c[0];document.getElementById("grade").textContent=c[1];document.getElementById("explain").textContent=c[2]}
+  gs.addEventListener("input",fly);fly();
+
+  // Assists
+  var as=[["autotrap","Auto-trap: the game flies the final approach for you",20],["noblack","No blackout or redout",15],["infammo","Unlimited ammo and fuel",15],["nocrash","Bounce off the ground instead of crashing",15],["easygun","Aim-assisted gun",15],["noskip","Skip the flight home after the target",5]];
+  var on=load("ifcd_as",{}),ab=document.getElementById("assists");
+  as.forEach(function(a){var l=document.createElement("label");l.setAttribute("for","as_"+a[0]);l.innerHTML='<input type="checkbox" id="as_'+a[0]+'"'+(on[a[0]]?" checked":"")+'>'+a[1];ab.appendChild(l);
+    l.querySelector("input").addEventListener("change",function(e){on[a[0]]=e.target.checked;save("ifcd_as",on);meter()})});
+  function meter(){var r=100;as.forEach(function(a){if(on[a[0]])r-=a[2]});document.getElementById("rm").style.width=r+"%";
+    document.getElementById("rl").textContent=r>=95?"Full realism":r>=70?"Realistic with a few helpers":r>=40?"Relaxed, like JetFighter III":"Arcade"}
+  meter();
+
+  // Decisions
+  var qs=[
+    {k:"first",q:"What should you be able to fly first?",why:"I suggest the carrier, because it's the most distinctive part and needs the new flight model anyway.",o:["Carrier traps","A guns-only dogfight","A bombing run"]},
+    {k:"real",q:"What should the default realism be?",why:"JetFighter III was light but not silly. Reviewers panned JF IV because the jet went wherever you pushed the stick.",o:["Like JetFighter III, relaxed","Realistic with helpers","Full sim, like DCS"]},
+    {k:"enemy",q:"Who is the enemy?",why:"JetFighter used real countries. A fictional coalition flying real Russian and Chinese jets avoids trouble when the game is public on AIQuorum.",o:["A fictional coalition","Real countries, like JF IV","No story, just missions"]},
+    {k:"theater",q:"Where is the home theater?",why:"JF IV used the Bay Area and Tahoe, and we already have SF Bay and Yosemite terrain.",o:["SF Bay and the Sierra","Pacific islands","Let me pick later"]},
+    {k:"jet",q:"Which jet should be the hero?",why:"The Super Hornet is the modern carrier jet. The F-14 is the one people remember.",o:["F/A-18E Super Hornet","F-14 Tomcat","F-35C"]},
+    {k:"story",q:"How much story do you want?",why:"Full Burn's video cutscenes were called \"grade Z cheese\". A short text or voice briefing is cheaper and ages better.",o:["Short briefings only","Voiced briefings with AI voices","None"]},
+    {k:"multi",q:"When should live multiplayer come?",why:"Leaderboards and ghost replays give the competitive feel with no server. Live dogfights need a server running on AIQuorum all the time.",o:["After the campaign","As early as possible","Never, solo is fine"]}
+  ];
+  var a=load("ifcd_a",{}),box=document.getElementById("decisions");
+  qs.forEach(function(q){var d=document.createElement("fieldset");d.className="q";d.style.margin="0";
+    var h='<legend style="padding:0"><h3>'+q.q+'</h3></legend><p class="why">'+q.why+'</p><div class="opts">';
+    q.o.forEach(function(o,i){var id=q.k+"_"+i;h+='<label for="'+id+'"><input type="radio" name="'+q.k+'" id="'+id+'" value="'+o+'"'+(a[q.k]===o?" checked":"")+'>'+o+'</label>'});
+    d.innerHTML=h+"</div>";box.appendChild(d);d.addEventListener("change",function(e){a[q.k]=e.target.value;save("ifcd_a",a)})});
+  document.getElementById("copy").addEventListener("click",function(){
+    var t="InfiniteFlight combat design answers:\n"+qs.map(function(q){return "- "+q.q+" "+(a[q.k]||"(no answer)")}).join("\n")+"\n- Assists I'd want on: "+(as.filter(function(x){return on[x[0]]}).map(function(x){return x[1]}).join("; ")||"none");
+    var c=document.getElementById("copied");
+    navigator.clipboard.writeText(t).then(function(){c.textContent="Copied. Paste it into Claude."},function(){c.textContent="Copy was blocked, so please select the questions and copy them by hand."});
+  });
+})();
+</script>

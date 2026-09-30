@@ -1,4 +1,13 @@
-# InfiniteFlight Handover - August 8, 2026
+# InfiniteFlight Handover - September 30, 2026
+
+## Update 2026-09-30: combat direction chosen
+- Michael asked about Unreal Engine.  We're staying on Three.js because the sim must run in browsers on AIQuorum (review: `InfiniteFlight_UnrealEngineReview_v01_2026-09-30.html`).
+- The project is now a modern JetFighter-style combat sim.  Design: `InfiniteFlight_CombatDesign_v02_2026-09-30.html` (https://claude.ai/artifact/LuJ2BDxwFC3CqfDH5A2Qfp).  Plan and Michael's answers: `InfiniteFlightCombatPlan_v01.0.0_Sep30.md`.
+- Key answers: carrier traps first, full-sim realism with no assists, F-14 as the hero jet, SF Bay and Sierra theater, fictional enemy coalition.
+- **The next step is still the joystick flight test below.  After that comes the F-14 flight model, with research first into public F-14 aero data.**
+
+---
+(August 8 state follows.)
 
 ## Current State
 Revamp Phase 0 + Phase 1 (joystick support) are BUILT and COMMITTED. The sim (`index.html`, **v01.2.0**) reads Michael's Microsoft SideWinder Precision 2 through the browser Gamepad API: no drivers, no dependencies. It loads clean in a real browser with zero JS errors.
