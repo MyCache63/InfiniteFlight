@@ -1,0 +1,5 @@
+[
+ {"name": "o1_low", "place": {"lat": 37.70, "lon": -122.95, "altFt": 300, "kt": 300, "hdg": 250}, "view": "orbit", "cam": {"yaw": 3.3, "pitch": -0.05, "dist": 30}, "advance": 0.1, "wait": 3, "hideui": true},
+ {"name": "o2_mid_sun", "time": 17.2, "place": {"lat": 37.70, "lon": -122.95, "altFt": 3000, "kt": 300, "hdg": 250}, "view": "orbit", "cam": {"yaw": 0.2, "pitch": -0.2, "dist": 30}, "advance": 0.1, "wait": 3, "hideui": true},
+ {"name": "o3_high", "time": 14, "place": {"lat": 37.70, "lon": -123.1, "altFt": 15000, "kt": 400, "hdg": 90}, "view": "chase", "cam": {"yaw": 0.0, "pitch": -0.35, "dist": 34}, "advance": 0.5, "wait": 5, "hideui": true}
+]

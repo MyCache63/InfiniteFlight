@@ -3,37 +3,60 @@ import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { patchCurvature } from './terrain.js';
 
-// Tileable ocean normal map built from integer-frequency waves so it wraps seamlessly.
-function makeWaveNormals(size = 512, seed = 7) {
-  let s = seed; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-  const waves = [];
-  for (let i = 0; i < 48; i++) {
-    const k = 1 + Math.floor(rnd() * 22), ang = rnd() * Math.PI * 2;
-    const kx = Math.round(Math.cos(ang) * k), ky = Math.round(Math.sin(ang) * k);
-    if (kx === 0 && ky === 0) continue;
-    waves.push({ kx, ky, a: 1 / Math.pow(Math.hypot(kx, ky), 1.35), ph: rnd() * 6.283 });
+// Tileable ocean normal map from a Phillips wave spectrum (Tessendorf, "Simulating Ocean Water", 2001):
+// random Gaussian amplitudes per wavevector, slopes by spectral differentiation, inverse FFT.
+// Seamless by construction and statistically isotropic apart from the wind direction.
+function fft1(re, im, inv) {
+  const n = re.length;
+  for (let i = 1, j = 0; i < n; i++) {
+    let bit = n >> 1; for (; j & bit; bit >>= 1) j ^= bit; j ^= bit;
+    if (i < j) { [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]]; }
   }
-  const c = document.createElement('canvas'); c.width = c.height = size;
-  const ctx = c.getContext('2d'); const img = ctx.createImageData(size, size);
-  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-    let dx = 0, dy = 0;
-    const u = x / size * 6.283185, v = y / size * 6.283185;
-    for (const w of waves) {
-      const t = w.kx * u + w.ky * v + w.ph;
-      // Sharpened crests: derivative of a trochoid-like profile.
-      const cs = Math.cos(t);
-      dx += w.a * w.kx * cs * (1 + 0.6 * Math.sin(t)); dy += w.a * w.ky * cs * (1 + 0.6 * Math.sin(t));
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = (inv ? 2 : -2) * Math.PI / len, wr = Math.cos(ang), wi = Math.sin(ang);
+    for (let i = 0; i < n; i += len) {
+      let cr = 1, ci = 0;
+      for (let k = 0; k < len / 2; k++) {
+        const ar = re[i + k], ai = im[i + k], br = re[i + k + len / 2] * cr - im[i + k + len / 2] * ci, bi = re[i + k + len / 2] * ci + im[i + k + len / 2] * cr;
+        re[i + k] = ar + br; im[i + k] = ai + bi; re[i + k + len / 2] = ar - br; im[i + k + len / 2] = ai - bi;
+        const t = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = t;
+      }
     }
-    const nx = -dx * 0.06, ny = -dy * 0.06, nz = 1;
-    const l = Math.hypot(nx, ny, nz);
-    const k = (y * size + x) * 4;
-    img.data[k] = (nx / l * 0.5 + 0.5) * 255; img.data[k + 1] = (ny / l * 0.5 + 0.5) * 255;
-    img.data[k + 2] = (nz / l * 0.5 + 0.5) * 255; img.data[k + 3] = 255;
+  }
+}
+function ifft2(re, im, N) {
+  const r = new Float64Array(N), m = new Float64Array(N);
+  for (let y = 0; y < N; y++) { for (let x = 0; x < N; x++) { r[x] = re[y * N + x]; m[x] = im[y * N + x]; } fft1(r, m, true); for (let x = 0; x < N; x++) { re[y * N + x] = r[x]; im[y * N + x] = m[x]; } }
+  for (let x = 0; x < N; x++) { for (let y = 0; y < N; y++) { r[y] = re[y * N + x]; m[y] = im[y * N + x]; } fft1(r, m, true); for (let y = 0; y < N; y++) { re[y * N + x] = r[y]; im[y * N + x] = m[y]; } }
+}
+function makeWaveNormals(N = 256, seed = 11, windDeg = 25, patch = 100, wind = 9) {
+  let s = seed; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  const gauss = () => Math.sqrt(-2 * Math.log(rnd() + 1e-12)) * Math.cos(6.283185 * rnd());
+  const L = wind * wind / 9.81, wd = [Math.cos(windDeg * Math.PI / 180), Math.sin(windDeg * Math.PI / 180)];
+  const sxR = new Float64Array(N * N), sxI = new Float64Array(N * N), syR = new Float64Array(N * N), syI = new Float64Array(N * N);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    const n = i < N / 2 ? i : i - N, m = j < N / 2 ? j : j - N;
+    const kx = 2 * Math.PI * n / patch, ky = 2 * Math.PI * m / patch, k = Math.hypot(kx, ky);
+    if (k < 1e-6) continue;
+    const kd = (kx * wd[0] + ky * wd[1]) / k;
+    const ph = Math.exp(-1 / ((k * L) ** 2)) / (k ** 4) * (0.35 + 0.65 * kd * kd) * Math.exp(-((k * 0.02) ** 2));
+    const a = Math.sqrt(ph / 2), hr = gauss() * a, hi = gauss() * a;
+    // Slope = i k h.
+    sxR[j * N + i] = -kx * hi; sxI[j * N + i] = kx * hr; syR[j * N + i] = -ky * hi; syI[j * N + i] = ky * hr;
+  }
+  ifft2(sxR, sxI, N); ifft2(syR, syI, N);
+  let rms = 0; for (let q = 0; q < N * N; q++) rms += sxR[q] ** 2 + syR[q] ** 2;
+  rms = Math.sqrt(rms / (N * N)) || 1;
+  const c = document.createElement('canvas'); c.width = c.height = N;
+  const ctx = c.getContext('2d'); const img = ctx.createImageData(N, N);
+  for (let q = 0; q < N * N; q++) {
+    const nx = -sxR[q] / rms * 0.35, ny = -syR[q] / rms * 0.35, l = Math.hypot(nx, ny, 1);
+    img.data[q * 4] = (nx / l * 0.5 + 0.5) * 255; img.data[q * 4 + 1] = (ny / l * 0.5 + 0.5) * 255;
+    img.data[q * 4 + 2] = (1 / l * 0.5 + 0.5) * 255; img.data[q * 4 + 3] = 255;
   }
   ctx.putImageData(img, 0, 0);
   const t = new THREE.CanvasTexture(c);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.NoColorSpace;
-  t.anisotropy = 8;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.NoColorSpace; t.anisotropy = 16;
   return t;
 }
 
@@ -42,7 +65,7 @@ export class Environment {
     this.scene = scene; this.renderer = renderer;
     this.sky = new Sky(); this.sky.scale.setScalar(4.5e5);
     const u = this.sky.material.uniforms;
-    u.turbidity.value = 3.2; u.rayleigh.value = 1.25; u.mieCoefficient.value = 0.004; u.mieDirectionalG.value = 0.82;
+    u.turbidity.value = 2.2; u.rayleigh.value = 1.9; u.mieCoefficient.value = 0.004; u.mieDirectionalG.value = 0.82;
     scene.add(this.sky);
     this.sunDir = new THREE.Vector3();
     this.sun = new THREE.DirectionalLight(0xfff3e0, 3.0);
@@ -74,7 +97,7 @@ export class Environment {
     this.sun.color.setRGB(1, 0.78 + 0.2 * warm, 0.6 + 0.35 * warm);
     this.sun.intensity = 3.2 * Math.max(0.05, Math.min(1, el / 0.12));
     this.hemi.intensity = 0.35 + 0.65 * Math.max(0, Math.min(1, (el + 0.05) / 0.3));
-    this.scene.fog.color.setRGB(0.62 + 0.1 * (1 - warm), 0.72, 0.82).multiplyScalar(0.25 + 0.75 * Math.max(0, Math.min(1, (el + 0.05) / 0.25)));
+    this.scene.fog.color.setRGB(0.55 + 0.1 * (1 - warm), 0.66, 0.8).multiplyScalar(0.25 + 0.75 * Math.max(0, Math.min(1, (el + 0.05) / 0.25)));
     // Environment map for reflections on the jet, ship and water.
     const skyScene = new THREE.Scene(); const sky2 = new Sky(); sky2.scale.setScalar(1000);
     Object.assign(sky2.material.uniforms.sunPosition.value, this.sunDir);
@@ -104,8 +127,8 @@ export class Environment {
     const uvs = []; for (let i = 0; i < pos.length; i += 3) uvs.push(pos[i] / 61, -pos[i + 2] / 61);
     g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
     g.computeVertexNormals();
-    const mat = new THREE.MeshStandardMaterial({ color: 0x0d2a3c, roughness: 0.06, metalness: 0.0, normalMap: nrm, envMapIntensity: 1.0 });
-    mat.normalScale.set(0.42, 0.42);
+    const mat = new THREE.MeshStandardMaterial({ color: 0x06202e, roughness: 0.14, metalness: 0.0, normalMap: nrm, envMapIntensity: 1.0 });
+    mat.normalScale.set(0.3, 0.3);
     const uniforms = { uTime: { value: 0 }, uNrm: { value: nrm } };
     this.oceanUniforms = uniforms;
     mat.userData.onShader = (sh) => {

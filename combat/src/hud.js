@@ -85,6 +85,22 @@ export class HUD {
     x.textAlign = 'center';
     x.fillText(flags.join('   '), cx, H * 0.8);
     x.fillText('FUEL ' + Math.round(ac.fuel / 0.4536 / 10) * 10 + ' LB', cx, H * 0.8 + 18 * d);
+    if (extra.lso) { x.font = `bold ${16 * d}px "IBM Plex Mono", Menlo, monospace`; x.fillStyle = '#ffe9a8'; x.textAlign = 'center'; x.fillText(extra.lso, cx, H * 0.88); x.fillStyle = this.color; }
+    if (extra.board && extra.board.length) {
+      x.font = `${12 * d}px "IBM Plex Mono", Menlo, monospace`; x.textAlign = 'left';
+      x.fillStyle = 'rgba(8,16,14,0.5)'; x.fillRect(W - 250 * d, 60 * d, 238 * d, (22 + 16 * Math.min(6, extra.board.length)) * d);
+      x.fillStyle = this.color; x.fillText('GREENIE BOARD', W - 240 * d, 72 * d);
+      extra.board.slice(0, 6).forEach((b, i) => x.fillText(`${b.grade.padEnd(5)} ${b.wire ? b.wire + '-wire' : '      '} ${b.comments.slice(0, 16)}`, W - 240 * d, (90 + i * 16) * d));
+    }
+    if (extra.ball !== undefined && extra.ball !== null) {
+      // Lens repeater (an assist): ball against datum lights.
+      const bx = W - 70 * d, by = H * 0.5, cell = 9 * d;
+      x.fillStyle = 'rgba(0,0,0,0.5)'; x.fillRect(bx - 50 * d, by - 70 * d, 100 * d, 140 * d);
+      x.fillStyle = '#30ff60'; for (let k = 0; k < 4; k++) { x.fillRect(bx - 46 * d + k * 8 * d, by - 2 * d, 5 * d, 4 * d); x.fillRect(bx + 16 * d + k * 8 * d, by - 2 * d, 5 * d, 4 * d); }
+      const yb = by - Math.max(-6.5, Math.min(5.5, extra.ball)) * cell;
+      x.fillStyle = extra.ball < -5 ? '#ff3020' : '#ffb030'; x.beginPath(); x.arc(bx, yb, 6 * d, 0, 6.283); x.fill();
+      x.fillStyle = this.color;
+    }
     if (extra.message) { x.font = `bold ${18 * d}px "IBM Plex Mono", Menlo, monospace`; x.fillText(extra.message, cx, H * 0.3); }
     x.restore();
   }

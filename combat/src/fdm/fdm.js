@@ -45,13 +45,15 @@ const dot = (a, b) => a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
 // Landing gear and contact points, body frame metres from the CG (EST from F-14 drawings:
 // wheelbase 7.0 m, track 5.0 m, CG about 2.0 m above the ground on the gear).
 export const GEAR = [
-  { name: 'nose', p: [6.25, 0, 1.95], k: 2.4e5, c: 3.2e4, stroke: 0.45, steer: true },
-  { name: 'left', p: [-0.75, -2.5, 1.95], k: 5.2e5, c: 6.5e4, stroke: 0.55 },
-  { name: 'right', p: [-0.75, 2.5, 1.95], k: 5.2e5, c: 6.5e4, stroke: 0.55 },
+  { name: 'nose', p: [6.25, 0, 2.2], k: 2.4e5, c: 3.2e4, stroke: 0.45, steer: true },
+  { name: 'left', p: [-0.75, -2.5, 2.2], k: 5.2e5, c: 6.5e4, stroke: 0.55 },
+  { name: 'right', p: [-0.75, 2.5, 2.2], k: 5.2e5, c: 6.5e4, stroke: 0.55 },
 ];
 // Hard points that mean a crash if they touch: nose tip, tails, belly, wingtips at 20 deg sweep.
-const HARD = [[9.5, 0, 0.6], [-9.0, 0, -0.2], [-7.5, 0, 0.9], [2.0, 0, 1.1], [-2.0, -9.6, 0.4], [-2.0, 9.6, 0.4],
-  [-8.3, -2.6, -2.9], [-8.3, 2.6, -2.9]];
+const HARD = [[9.5, 0, 0.6], [-9.0, 0, -0.2], [2.0, 0, 1.2], [-2.0, -9.6, 0.4], [-2.0, 9.6, 0.4], [-8.3, -2.6, -2.9], [-8.3, 2.6, -2.9]];
+// Scrape points: touching these damages the jet (NATOPS warns of ventral fin and nozzle damage above 17 units)
+// but is not a crash by itself.
+const SCRAPE = [[-5.2, -1.35, 1.45], [-5.2, 1.35, 1.45], [-9.4, -1.35, 1.05], [-9.4, 1.35, 1.05]];
 export const HOOK_POINT = [-7.9, 0, 1.55]; // tailhook tip when down (EST)
 export const EYE_POINT = [5.2, 0, -1.15];  // pilot eye (EST)
 
@@ -77,7 +79,7 @@ export class F14 {
     this.qwash = 0; this.rwash = 0;
     this.extForce = [0, 0, 0]; this.extMoment = [0, 0, 0]; // world force at CG, body moment (hook, cat)
     this.contacts = GEAR.map(() => ({ on: false, comp: 0, compDot: 0, load: 0 }));
-    this.crashed = false; this.crashReason = ''; this.gearBroken = false; this.onGround = onGround;
+    this.crashed = false; this.crashReason = ''; this.gearBroken = false; this.onGround = onGround; this.scrapes = 0; this.scraping = false;
     this.maxG = 1; this.nz = 1; this.t = 0;
     this.lastTouchSink = 0;
     for (const e of [this.engL, this.engR]) { e.T = onGround ? 4000 : 40000; e.Tdot = 0; e.ab = 0; }
@@ -165,7 +167,7 @@ export class F14 {
       flaps: this.flaps, slats: this.slats, gear: this.gear, speedbrake: this.speedbrake, xcg: 14 });
     // Ground effect (EST): lift up to +15% and induced drag down within one span of the surface.
     const hAGL = env.agl ? env.agl(pos) : 1e4;
-    if (hAGL < B) { const ge = 1 - hAGL / B; co.CL *= 1 + 0.15 * ge * ge; }
+    if (hAGL < B * 0.7) { const ge = 1 - hAGL / (B * 0.7); co.CL *= 1 + 0.06 * ge * ge; }
     const ca = Math.cos(alpha), sa = Math.sin(alpha), cb = Math.cos(beta), sb = Math.sin(beta);
     // Stability-axis lift and drag into body axes.
     const D = qbar * S * co.CD, L = qbar * S * co.CL, Y = qbar * S * co.CY;
@@ -271,15 +273,24 @@ export class F14 {
   checkDamage(env, gearOut) {
     for (const o of gearOut) {
       if (!o) continue;
-      if (o.sink > this.lastTouchSink) this.lastTouchSink = o.sink;
-      // F-14 gear design limit is about 1,520 fpm (7.7 m/s) sink at touchdown (NATOPS figure).
-      if (o.sink > 8.5) { this.gearBroken = true; this.crash('gear collapsed, sink rate ' + Math.round(o.sink * 196.85) + ' fpm'); }
+      const main = GEAR[o.i].name !== 'nose';
+      if (main && o.sink > this.lastTouchSink) this.lastTouchSink = o.sink;
+      // F-14 main gear design limit is about 1,520 fpm (7.7 m/s) at touchdown (NATOPS). The nose gear takes
+      // the slap-down after an arrestment, so it gets a higher margin (EST).
+      if (o.sink > (main ? 8.5 : 12)) { this.gearBroken = true; this.crash((main ? 'main' : 'nose') + ' gear collapsed, sink rate ' + Math.round(o.sink * 196.85) + ' fpm'); }
     }
     if (env.surface) {
-      for (const hp of HARD) {
-        const pw = add(this.pos, qrot(this.q, hp));
+      const names = ['nose', 'tail cone', 'belly', 'left wingtip', 'right wingtip', 'left fin', 'right fin'];
+      for (const sp of SCRAPE) {
+        const pw = add(this.pos, qrot(this.q, sp));
         const srf = env.surface(pw);
-        if (pw[2] > -srf.h + 0.02) { this.crash(srf.water ? 'hit the water' : 'hit the ground'); break; }
+        if (pw[2] > -srf.h) { if (!this.scraping) this.scrapes = (this.scrapes || 0) + 1; this.scraping = true; if (srf.water) this.crash('hit the water'); }
+        else this.scraping = false;
+      }
+      for (let i = 0; i < HARD.length; i++) {
+        const pw = add(this.pos, qrot(this.q, HARD[i]));
+        const srf = env.surface(pw);
+        if (pw[2] > -srf.h + 0.02) { this.crash((srf.water ? 'hit the water' : srf.deck ? 'hit the deck' : 'hit the ground') + ' (' + names[i] + ')'); break; }
       }
       if (this.gear < 0.95) {
         const belly = add(this.pos, qrot(this.q, [0, 0, 1.3]));

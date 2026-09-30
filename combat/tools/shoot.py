@@ -50,6 +50,8 @@ with sync_playwright() as p:
         ft = pg.evaluate("""() => new Promise(r => { let n = 0; const t0 = performance.now(); const f = () => { if (++n < 30) requestAnimationFrame(f); else r((performance.now() - t0) / 30); }; requestAnimationFrame(f); })""")
         path = os.path.join(outdir, s['name'] + '.png')
         pg.screenshot(path=path)
+        extra = pg.evaluate('window.__trap || ""')
+        if extra: print('  data:', extra); pg.evaluate('window.__trap = ""')
         print(f"shot {s['name']}  frame {ft:.1f} ms  terrain {pg.evaluate('IFC.terrainReady()')}")
     print('\n'.join(logs[:40]) or 'no console errors')
     b.close()

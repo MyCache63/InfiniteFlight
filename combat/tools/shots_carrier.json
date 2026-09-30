@@ -1,0 +1,8 @@
+[
+ {"name": "c1_groove_cockpit", "setup": "IFC.startGroove(1400)", "view": "cockpit", "advance": 0.05, "wait": 20},
+ {"name": "c2_groove_chase", "setup": "IFC.startGroove(900)", "view": "chase", "cam": {"yaw": 0.3, "pitch": -0.12, "dist": 40}, "advance": 0.05, "wait": 8},
+ {"name": "c3_ship_overview", "setup": "IFC.startGroove(600)", "view": "orbit", "cam": {"yaw": 2.6, "pitch": -0.35, "dist": 420}, "advance": 0.05, "wait": 8},
+ {"name": "c4_auto_pass_short", "setup": "IFC.startGroove(1400); IFC.stepAuto(9)", "view": "chase", "cam": {"yaw": 0.4, "pitch": -0.1, "dist": 45}, "advance": 0.0, "wait": 6},
+ {"name": "c5_auto_trap", "setup": "IFC.startGroove(1400); IFC.stepAuto(24); window.__trap = JSON.stringify({trap: IFC.carrier.trap && {wire: IFC.carrier.trap.wire, run: IFC.carrier.trap.run}, board: IFC.carrier.lso.board[0], crashed: IFC.ac.crashed, why: IFC.ac.crashReason, hook: IFC.carrier.hookInfo, kts: IFC.ac.V/0.5144})", "view": "orbit", "cam": {"yaw": 2.2, "pitch": -0.3, "dist": 60}, "advance": 0.0, "wait": 6},
+ {"name": "c6_cat", "setup": "IFC.startCat()", "view": "orbit", "cam": {"yaw": 2.4, "pitch": -0.25, "dist": 40}, "advance": 0.2, "wait": 6}
+]
