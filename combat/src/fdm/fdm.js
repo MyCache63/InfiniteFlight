@@ -103,15 +103,15 @@ export class F14 {
     let ds = (c.pitch >= 0 ? -33 * c.pitch : -10 * c.pitch) + c.trim;
     // Pitch SAS: washed-out pitch-rate damping, +/-3 deg authority (TM-81833).
     this.qwash += (qd - this.qwash) * Math.min(1, dt / 1.5);
-    ds += Math.max(-3, Math.min(3, 0.25 * (qd - this.qwash * 0.3)));
+    if (!this.sasOff) ds += Math.max(-3, Math.min(3, 0.25 * (qd - this.qwash * 0.3)));
     ds = Math.max(-33, Math.min(10, ds));
     // Roll: differential tail +/-7 mech plus +/-5 SAS, and spoilers.
-    let da = 12 * c.roll - Math.max(-5, Math.min(5, 0.06 * pd));
+    let da = (this.sasOff ? 7 : 12) * c.roll - (this.sasOff ? 0 : Math.max(-5, Math.min(5, 0.06 * pd)));
     da = Math.max(-12, Math.min(12, da));
-    const sp = c.roll;
+    const sp = this.noSpoilers ? 0 : c.roll;
     // Yaw: +/-30 deg rudder, yaw SAS damper with washout (EST gains).
     this.rwash += (rd - this.rwash) * Math.min(1, dt / 2.0);
-    let dr = -30 * c.yaw + Math.max(-9.5, Math.min(9.5, 0.9 * (rd - this.rwash)));
+    let dr = -30 * c.yaw + (this.sasOff ? 0 : Math.max(-9.5, Math.min(9.5, 0.9 * (rd - this.rwash))));
     dr = Math.max(-30, Math.min(30, dr));
     // Actuators: 0.05 s lag plus rate limits.
     const act = (cur, cmd, rate) => {
