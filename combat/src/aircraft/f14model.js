@@ -614,20 +614,25 @@ export class F14Model {
 
     // ---------------- Afterburner flames: layered additive cones with shock diamonds ----------------
     this.flames = [];
-    const flameMat = (c, o) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    // Fade along the plume: bright at the nozzle, gone at the tip (cone uv v runs along its height).
+    const fadeTex = (() => { const c = document.createElement('canvas'); c.width = 4; c.height = 128; const x = c.getContext('2d'); const g = x.createLinearGradient(0, 0, 0, 128); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.55, 'rgba(255,255,255,0.35)'); g.addColorStop(1, 'rgba(255,255,255,1)'); x.fillStyle = g; x.fillRect(0, 0, 4, 128); return new THREE.CanvasTexture(c); })();
+    const flameMat = (c, o) => new THREE.MeshBasicMaterial({ color: c, map: fadeTex, transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
     for (const side of [-1, 1]) {
       const g = new THREE.Group(); g.position.set(-9.62, side * NY, 0.18); B.add(g);
-      const outer = new THREE.Mesh(new THREE.ConeGeometry(0.4, 4.2, 20, 1, true), flameMat(0xff8a3a, 0.35));
-      outer.rotation.z = Math.PI / 2; outer.position.x = -2.1; g.add(outer);
-      const core = new THREE.Mesh(new THREE.ConeGeometry(0.28, 2.6, 16, 1, true), flameMat(0x9ec8ff, 0.6));
-      core.rotation.z = Math.PI / 2; core.position.x = -1.3; g.add(core);
+      // Short plume: orange skirt about 3 m, blue-white core about 1.5 m, five shock diamonds, glowing exit disc.
+      const outer = new THREE.Mesh(new THREE.ConeGeometry(0.42, 3.0, 20, 1, true), flameMat(0xff7a2a, 0.3));
+      outer.rotation.z = Math.PI / 2; outer.position.x = -1.5; g.add(outer);
+      const core = new THREE.Mesh(new THREE.ConeGeometry(0.26, 1.5, 16, 1, true), flameMat(0xbfd8ff, 0.8));
+      core.rotation.z = Math.PI / 2; core.position.x = -0.75; g.add(core);
+      const disc = new THREE.Mesh(new THREE.CircleGeometry(0.43, 20), new THREE.MeshBasicMaterial({ color: 0xffd9a0, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+      disc.rotation.y = -Math.PI / 2; disc.position.x = 0.02; g.add(disc);
       const diamonds = [];
-      for (let i = 0; i < 4; i++) {
-        const d = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 8), flameMat(0xffd6a0, 0.5));
-        d.scale.set(1.7, 1, 1); d.position.x = -0.7 - i * 0.75; g.add(d); diamonds.push(d);
+      for (let i = 0; i < 5; i++) {
+        const d = new THREE.Mesh(new THREE.SphereGeometry(0.13 - i * 0.012, 10, 8), new THREE.MeshBasicMaterial({ color: 0xfff0d0, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+        d.scale.set(1.9, 1, 1); d.position.x = -0.45 - i * 0.52; g.add(d); diamonds.push(d);
       }
       g.visible = false;
-      this.flames.push({ g, outer, core, diamonds });
+      this.flames.push({ g, outer, core, diamonds, disc });
     }
     // Glove shoulder pylons with launch rails.
     for (const side of [-1, 1]) {
@@ -830,9 +835,10 @@ export class F14Model {
       f.g.visible = a > 0.02;
       if (!f.g.visible) return;
       const flick = 0.92 + 0.08 * Math.sin(t * 60 + i * 2) + 0.05 * Math.sin(t * 23.7);
-      f.g.scale.set(0.6 + 0.7 * a * flick, 1, 1);
-      f.outer.material.opacity = 0.18 + 0.25 * a; f.core.material.opacity = 0.35 + 0.35 * a;
-      f.diamonds.forEach((d, k) => { d.material.opacity = (0.45 - k * 0.09) * a; });
+      f.g.scale.set(0.55 + 0.6 * a * flick, 1, 1);
+      f.outer.material.opacity = (0.15 + 0.25 * a) * flick; f.core.material.opacity = 0.45 + 0.4 * a;
+      f.disc.material.opacity = 0.5 + 0.45 * a;
+      f.diamonds.forEach((d, k) => { d.material.opacity = (0.6 - k * 0.1) * a * flick; });
     });
     this.beacon.visible = Math.floor(t * 1.2) % 2 === 0;
   }

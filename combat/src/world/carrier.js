@@ -269,6 +269,14 @@ export class Carrier {
     this.buildLens();
     // Wake: foam trail astern.
     this.wake = new THREE.Group(); const wk = this.makeWake(); wk.position.set(-HALF_L - 690, 0.2, 0); this.wake.add(wk); g.add(this.wake);
+    // Bow waves: white foam curling off both sides of the bow and spreading aft.
+    const bw = (() => { const c = document.createElement('canvas'); c.width = 512; c.height = 64; const x = c.getContext('2d');
+      for (let i = 0; i < 1500; i++) { const u = Math.random(), v = Math.random(); x.fillStyle = `rgba(255,255,255,${(0.5 * (1 - u) + 0.05) * v})`; x.beginPath(); x.ellipse(u * 512, 32 + (Math.random() - 0.5) * 50 * (0.3 + u), 2 + v * 5, 1 + v * 2, 0, 0, 6.28); x.fill(); }
+      return new THREE.CanvasTexture(c); })();
+    for (const side of [-1, 1]) {
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(260, 22), new THREE.MeshBasicMaterial({ map: bw, transparent: true, depthWrite: false, opacity: 0.9, polygonOffset: true, polygonOffsetFactor: -4 }));
+      m.rotation.x = -Math.PI / 2; m.rotation.z = side * 0.24 + Math.PI; m.position.set(150 - 125, 0.25, side * (8 + 125 * Math.sin(0.24))); this.wake.add(m);
+    }
     this.group.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   }
 
@@ -361,18 +369,20 @@ export class Carrier {
     const W = 4096, H = 1024, c = document.createElement('canvas'); c.width = W; c.height = H;
     const x = c.getContext('2d');
     const X = (lx) => (lx + 170) / 340 * W, Y = (ly) => (1 - (ly + 40) / 80) * H; // ship y (stbd) up in texture
-    x.fillStyle = '#44484c'; x.fillRect(0, 0, W, H);
+    x.fillStyle = '#34373b'; x.fillRect(0, 0, W, H);
     // Non-skid mottling and rubber and fuel stains in the landing area.
-    for (let i = 0; i < 9000; i++) { const v = 55 + Math.random() * 25; x.fillStyle = `rgba(${v},${v + 2},${v + 5},0.25)`; x.fillRect(Math.random() * W, Math.random() * H, 3 + Math.random() * 10, 2 + Math.random() * 6); }
+    for (let i = 0; i < 14000; i++) { const v = 40 + Math.random() * 30; x.fillStyle = `rgba(${v + 6},${v + 3},${v},0.22)`; x.fillRect(Math.random() * W, Math.random() * H, 3 + Math.random() * 12, 2 + Math.random() * 6); }
+    // Tan and brown wear, heavier around the cats and the landing area.
+    for (let i = 0; i < 900; i++) { x.fillStyle = `rgba(${120 + Math.random() * 40},${100 + Math.random() * 30},${70 + Math.random() * 20},${0.03 + Math.random() * 0.05})`; x.beginPath(); x.ellipse(Math.random() * W, Math.random() * H, 10 + Math.random() * 60, 4 + Math.random() * 20, Math.random() * 3, 0, 6.28); x.fill(); }
     const P = (s, lat) => { const p = this.landingPoint(s, lat); return [X(p[0]), Y(p[1])]; };
     x.save();
-    for (let i = 0; i < 70; i++) { const [px, py] = P(40 + Math.random() * 90, (Math.random() - 0.5) * 8); x.fillStyle = 'rgba(20,20,22,0.18)'; x.beginPath(); x.ellipse(px, py, 40 + Math.random() * 90, 4 + Math.random() * 6, -ANG, 0, 6.28); x.fill(); }
+    for (let i = 0; i < 160; i++) { const [px, py] = P(35 + Math.random() * 110, (Math.random() - 0.5) * 9); x.fillStyle = 'rgba(12,12,12,0.22)'; x.beginPath(); x.ellipse(px, py, 40 + Math.random() * 90, 4 + Math.random() * 6, -ANG, 0, 6.28); x.fill(); }
     x.restore();
     const line = (a, b, col, w, dash) => { x.strokeStyle = col; x.lineWidth = w; x.setLineDash(dash || []); x.beginPath(); x.moveTo(...a); x.lineTo(...b); x.stroke(); x.setLineDash([]); };
     // Landing area edge lines (white), centerline (white dashed), foul lines (red/white).
-    line(P(0, -12), P(235, -12), '#e8e6dc', 6); line(P(0, 12), P(235, 12), '#e8e6dc', 6);
+    line(P(0, -12), P(235, -12), '#d6d3c6', 6); line(P(0, 12), P(235, 12), '#d6d3c6', 6);
     line(P(0, 0), P(235, 0), '#e8e6dc', 5, [60, 40]);
-    line(P(0, 16), P(240, 16), '#c9c02a', 4, [30, 20]);
+    line(P(0, 16), P(240, 16), '#b3a545', 4, [30, 20]);
     // Ramp stripes.
     for (let k = -12; k < 12; k += 3) line(P(0, k), P(6, k + 1.5), '#e8e6dc', 8);
     // Bow catapult tracks and a waist cat.
@@ -381,7 +391,7 @@ export class Carrier {
     // Deck numbers at the bow and a yellow taxi line.
     x.fillStyle = '#e8e6dc'; x.font = 'bold 150px Arial'; x.textAlign = 'center';
     x.save(); x.translate(X(135), Y(0)); x.rotate(Math.PI / 2); x.fillText('70', 0, 50); x.restore();
-    line([X(-60), Y(26)], [X(110), Y(26)], '#c9c02a', 4, [40, 30]);
+    line([X(-60), Y(26)], [X(110), Y(26)], '#b3a545', 4, [40, 30]);
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 16;
     return t;
   }
@@ -431,13 +441,13 @@ export class Carrier {
     const x = c.getContext('2d');
     for (let i = 0; i < 6000; i++) {
       const u = Math.random(), v = Math.random();
-      const spread = 0.12 + (1 - u) * 0.75;
+      const spread = 0.28 + (1 - u) * 0.7;
       const yy = 128 + (Math.random() - 0.5) * 256 * spread * (0.4 + 0.6 * Math.random());
-      const a = (0.05 + 0.35 * u * u) * v;
+      const a = (0.06 + 0.5 * Math.pow(u, 1.5)) * v;
       x.fillStyle = `rgba(255,255,255,${a})`; x.beginPath(); x.ellipse(u * 2048, yy, 3 + v * 12, 1 + v * 3, 0, 0, 6.28); x.fill();
     }
     const t = new THREE.CanvasTexture(c);
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(1380, 110), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, opacity: 0.85, polygonOffset: true, polygonOffsetFactor: -4 }));
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1380, 190), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, opacity: 0.95, polygonOffset: true, polygonOffsetFactor: -4 }));
     m.rotation.x = -Math.PI / 2; m.renderOrder = 2;
     return m;
   }

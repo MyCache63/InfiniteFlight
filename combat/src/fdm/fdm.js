@@ -45,9 +45,9 @@ const dot = (a, b) => a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
 // Landing gear and contact points, body frame metres from the CG (EST from F-14 drawings:
 // wheelbase 7.0 m, track 5.0 m, CG about 2.0 m above the ground on the gear).
 export const GEAR = [
-  { name: 'nose', p: [6.25, 0, 2.2], k: 2.4e5, c: 3.2e4, stroke: 0.45, steer: true },
-  { name: 'left', p: [-0.75, -2.5, 2.2], k: 5.2e5, c: 6.5e4, stroke: 0.55 },
-  { name: 'right', p: [-0.75, 2.5, 2.2], k: 5.2e5, c: 6.5e4, stroke: 0.55 },
+  { name: 'nose', p: [6.25, 0, 2.05], k: 2.4e5, c: 3.2e4, stroke: 0.45, steer: true },
+  { name: 'left', p: [-0.75, -2.5, 2.05], k: 5.2e5, c: 6.5e4, stroke: 0.55 },
+  { name: 'right', p: [-0.75, 2.5, 2.05], k: 5.2e5, c: 6.5e4, stroke: 0.55 },
 ];
 // Hard points that mean a crash if they touch: nose tip, tails, belly, wingtips at 20 deg sweep.
 const HARD = [[9.5, 0, 0.6], [-9.0, 0, -0.2], [2.0, 0, 1.2], [-2.0, -9.6, 0.4], [-2.0, 9.6, 0.4], [-8.3, -2.6, -2.9], [-8.3, 2.6, -2.9]];

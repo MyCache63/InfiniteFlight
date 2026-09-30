@@ -9,13 +9,17 @@ import { Input } from './input.js';
 import { HUD } from './hud.js';
 import { Audio } from './audio.js';
 import { Clouds } from './world/clouds.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { llToEN } from './world/geo.js';
 import { Carrier, DECK_H } from './world/carrier.js';
 import { trim } from './fdm/trim.js';
 import { qinvrot, qFromEuler } from './fdm/fdm.js';
 
-export const VERSION = 'v00.2.0';
-export const BUILD = '2026-09-30 13:20 PT';
+export const VERSION = 'v00.3.0';
+export const BUILD = '2026-09-30 16:10 PT';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(2, devicePixelRatio));
@@ -27,7 +31,14 @@ document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.2, 6e5);
-addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
+// Post-processing: a subtle bloom so only very bright things (sun, afterburner, lens lights) glow.
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.35, 0.45, 0.92);
+bloom.enabled = false; // the sky itself is above any useful threshold, so bloom washed out the frame
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
 
 const env = new Environment(scene, renderer);
 const terrain = new Terrain(scene, renderer);

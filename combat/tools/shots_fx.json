@@ -1,0 +1,6 @@
+[
+ {"name": "f1_ab", "time": 16.8, "place": {"lat": 37.6, "lon": -123.4, "altFt": 20000, "kt": 520, "hdg": 250}, "view": "orbit", "cam": {"yaw": 0.35, "pitch": -0.08, "dist": 26}, "advance": 0.3, "wait": 6, "hideui": true, "setup": "IFC.ac.ctl.throttle=1; IFC.input.throttle=1; for (const e of [IFC.ac.engL, IFC.ac.engR]) { e.T = 12350*4.448; e.ab = 1; }"},
+ {"name": "f2_ship", "setup": "IFC.startCat()", "view": "orbit", "cam": {"yaw": 1.8, "pitch": -0.3, "dist": 330}, "advance": 0.05, "wait": 6, "hideui": true},
+ {"name": "f3_deck", "setup": "IFC.startCat()", "view": "orbit", "cam": {"yaw": 2.9, "pitch": -0.35, "dist": 40}, "advance": 0.05, "wait": 6, "hideui": true},
+ {"name": "f4_groove", "setup": "IFC.startGroove(900)", "view": "chase", "cam": {"yaw": 0.25, "pitch": -0.1, "dist": 36}, "advance": 0.05, "wait": 6, "hideui": true}
+]
