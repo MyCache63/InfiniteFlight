@@ -21,22 +21,31 @@
 <div id="info">F-14 model viewer. Keys: 1 side, 2 top, 3 front, 4 rear, 5-8 three-quarter views, 9 cockpit, G gear, W sweep, F flaps, B speed brake, H hook, A afterburner. Drag to orbit.</div>
 <script type="module">
 import * as THREE from 'three';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { Sky } from 'three/addons/objects/Sky.js';
 import { F14Model } from '../src/aircraft/f14model.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(Math.min(2, devicePixelRatio));
 renderer.setSize(innerWidth, innerHeight);
-renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.62;  // same as main.js
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xb9c7d3);
-const pmrem = new THREE.PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-scene.environmentIntensity = 0.55;
+// Lighting copied from combat/src/world/environment.js at 15:30 (sun elevation about 38 deg), so the paint
+// reads here the way it will in the sim: Preetham sky environment, sun 3.2, hemisphere 0.9.
+const B0 = (x, y, z) => new THREE.Vector3(y, -z, -x);
+const sunDir = B0(0.45, -0.62, -0.64).normalize();
+{
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const skyScene = new THREE.Scene(); const sky = new Sky(); sky.scale.setScalar(1000);
+  const u = sky.material.uniforms; u.turbidity.value = 3.2; u.rayleigh.value = 1.25; u.mieCoefficient.value = 0.004; u.mieDirectionalG.value = 0.82;
+  u.sunPosition.value.copy(sunDir); skyScene.add(sky);
+  skyScene.add(new THREE.Mesh(new THREE.SphereGeometry(900, 16, 8, 0, Math.PI * 2, Math.PI / 2 + 0.02, Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x5d7488, side: THREE.BackSide })));
+  scene.environment = pmrem.fromScene(skyScene, 0.02).texture;
+}
 
 // Body axes (x fwd, y right, z down) to three.js (x east, y up, z south), same as main.js.
 const qC = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().set(0, 1, 0, 0, 0, 0, -1, 0, -1, 0, 0, 0, 0, 0, 0, 1));
@@ -47,13 +56,13 @@ const model = new F14Model();
 model.root.quaternion.copy(qC);
 scene.add(model.root);
 
-const sun = new THREE.DirectionalLight(0xfff4e6, 2.6);
-sun.position.copy(B(6, -9, -14)); sun.castShadow = true;
+const sun = new THREE.DirectionalLight(0xfff3e6, 3.2);
+sun.position.copy(sunDir.clone().multiplyScalar(30)); sun.castShadow = true;
 sun.shadow.mapSize.set(4096, 4096);
 Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14, near: 1, far: 60 });
 sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02;
 scene.add(sun);
-scene.add(new THREE.HemisphereLight(0xcfe0f0, 0x6b6a60, 0.6));
+scene.add(new THREE.HemisphereLight(0xbfd6ff, 0x5a5448, 0.9));
 
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshStandardMaterial({ color: 0x8c8d86, roughness: 0.95 }));
 ground.rotation.x = -Math.PI / 2; ground.position.y = -GROUND_Z; ground.receiveShadow = true; scene.add(ground);

@@ -32,6 +32,7 @@ SHOTS = {
     'hookv':     {'view': 'hookv', 'hookPos': 1, 'speedbrake': 1},
     'wingc':     {'view': 'wingc', 'flaps': 1, 'slats': 1, 'sp': 1},
     'sideconf':  {'view': 'side', 'speedbrake': 1, 'hookPos': 1, 'flaps': 1, 'slats': 1, 'ds': -15, 'dr': 20},
+    'gearmid':   {'view': 'q3', 'gear': 0.5},
     'cockpit':   {'view': 'cockpit'},
     'rearseat':  {'view': 'rearseat'},
 }

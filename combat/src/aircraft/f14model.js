@@ -185,7 +185,7 @@ function detailTexture(size = 1024, seed = 7) {
     g.addColorStop(0, `rgba(${d},${d},${d},${0.025 + r() * 0.03})`); g.addColorStop(1, 'rgba(0,0,0,0)');
     x.fillStyle = g; x.fillRect(cx - rad, cy - rad, rad * 2, rad * 2);
   }
-  x.strokeStyle = 'rgba(40,44,50,0.24)'; x.lineWidth = 1.3;
+  x.strokeStyle = 'rgba(40,44,50,0.34)'; x.lineWidth = 1.3;
   const grid = [0.0, 0.17, 0.31, 0.5, 0.64, 0.83];
   for (const g of grid) { x.beginPath(); x.moveTo(g * size, 0); x.lineTo(g * size, size); x.stroke(); }
   for (let i = 0; i < 10; i++) {
@@ -227,8 +227,8 @@ function canvasTex(w, h, draw) {
   return t;
 }
 
-const PAINT_TOP = new THREE.Color(0x646d76);   // FS 36320 dark ghost gray, upper surfaces
-const PAINT_LOW = new THREE.Color(0x8e969e);   // FS 36375 light ghost gray, sides and underside
+const PAINT_TOP = new THREE.Color(0x525a63);   // FS 36320 dark ghost gray, upper surfaces
+const PAINT_LOW = new THREE.Color(0x737b83);   // FS 36375 light ghost gray, sides and underside
 const MARK = '#4a525a';                        // low-visibility markings
 
 // ---------------------------------------------------------------------------------------------------
@@ -241,12 +241,12 @@ export class F14Model {
     this.body = new THREE.Group();          // body axes x fwd, y right, z down
     this.root.add(this.body);
     const tex = detailTexture();
-    this.skin = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.6, metalness: 0.1 });
+    this.skin = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.66, metalness: 0.08, envMapIntensity: 0.55 });
     triplanar(this.skin, tex, 1 / 3.2);
-    this.radome = new THREE.MeshStandardMaterial({ color: 0x7e868d, roughness: 0.5, metalness: 0.05 });
+    this.radome = new THREE.MeshStandardMaterial({ color: 0x6f777e, roughness: 0.55, metalness: 0.05, envMapIntensity: 0.55 });
     triplanar(this.radome, tex, 1 / 6);
     this.dark = new THREE.MeshStandardMaterial({ color: 0x25282c, roughness: 0.7, metalness: 0.2 });
-    this.intakeMat = new THREE.MeshStandardMaterial({ color: 0x9aa0a5, roughness: 0.7, metalness: 0.1 });
+    this.intakeMat = new THREE.MeshStandardMaterial({ color: 0x8a9095, roughness: 0.75, metalness: 0.05, envMapIntensity: 0.35 });
     this.frame = new THREE.MeshStandardMaterial({ color: 0x3b4046, roughness: 0.55, metalness: 0.3 });
     this.metal = new THREE.MeshStandardMaterial({ color: 0x5b5752, roughness: 0.42, metalness: 0.85 });
     this.hot = new THREE.MeshStandardMaterial({ color: 0x2d2a28, roughness: 0.6, metalness: 0.6 });
@@ -389,15 +389,18 @@ export class F14Model {
       // Inner duct and lip.
       const inFace = rake(nRing(3.6, 0.055), 3.6);
       const duct = [inFace, rake(nRing(3.6, 0.07), 3.3), nRing(1.5, 0.08), nRing(0.9, 0.1, 48, 5), nRing(0.3, 0.13, 48, 3.5)];
-      this.add(loft(duct, { inward: true, capEnd: true }), this.intakeMat);
+      this.add(loft(duct, { inward: true }), this.intakeMat);
+      this.add(loft([duct[duct.length - 1], nRing(0.2, 0.14, 48, 3.5)], { inward: true, capEnd: true }), this.dark);
       this.add(loft([face, inFace], { outDir: () => V3(1, 0, -0.2) }), this.skin);
       // Variable ramp panels in the duct roof.
       const rw = NC.w(3.6) - 0.09, zr = NC.zt(3.6) + 0.07;
       const ramp = new THREE.Mesh(new THREE.BoxGeometry(1.5, rw * 2, 0.02), this.dark);
       ramp.position.set(2.45, yc, zr + 0.16); ramp.rotation.y = -0.2; B.add(ramp);
-      // Splitter plate: the inboard intake wall carried forward of the lip, standing off the fuselage.
-      const sp = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.02, NC.zb(3.6) - NC.zt(3.6) - 0.06), this.skin);
-      sp.position.set(3.7, side * (NY - NC.w(3.6) + 0.012), (NC.zt(3.6) + NC.zb(3.6)) / 2 - 0.05); B.add(sp);
+      // Splitter plate: the inboard intake wall carried a little ahead of the raked lip, standing off the fuselage.
+      const zt0 = NC.zt(3.6), zb0 = NC.zb(3.6), lipX = (z) => 3.6 - RAKE * (z - zt0) / (zb0 - zt0);
+      const spY = side * (NY - NC.w(3.6) + 0.01);
+      this.add(surface([zt0 + 0.02, (zt0 + zb0) / 2, zb0 - 0.05].map((z) => ({ y: z, xle: lipX(z) + 0.28, xte: lipX(z) - 0.6, z: 0, t: 0.012, f: SLAB })),
+        { nC: 6, capStart: true, capEnd: true, matrix: new THREE.Matrix4().makeBasis(V3(1, 0, 0), V3(0, 0, 1), V3(0, -1, 0)).setPosition(0, spY, 0) }), this.skin);
       // Diverter closing the boundary layer gap under the intake.
       this.add(surface([{ y: side * 0.8, xle: 2.6, xte: 0.2, z: 0.6, t: 0.05, f: SLAB }, { y: side * 1.02, xle: 2.6, xte: 0.2, z: 0.64, t: 0.05, f: SLAB }]), this.skin);
       // Nozzle: petal shroud, dark liner, flame holder.
@@ -456,9 +459,8 @@ export class F14Model {
       wmesh.push(this.add(surface([wst(1.0), wst(1.25)], { u0: SL, capEnd: true, mirror: m }), this.skin, pivot));
       wmesh.push(this.add(surface([wst(1.25), wst(3.0), wst(5.0), wst(6.95)], { u0: SL, u1: FL, mirror: m }), this.skin, pivot));
       wmesh.push(this.add(surface([wst(6.95), wst(7.05), tipSt], { capStart: true, capEnd: true, mirror: m }), this.skin, pivot));
-      const S = (y) => V3(0, side * y, 0);
       // Slats, hinged along their lower trailing edge.
-      const sA = afPt(station(wst(1.0)), SL, false).add(S(0)), sB = afPt(station(wst(6.95)), SL, false);
+      const sA = afPt(station(wst(1.0)), SL, false), sB = afPt(station(wst(6.95)), SL, false);
       if (m) { sA.y = -sA.y; sB.y = -sB.y; }
       const slF = m ? hingeFrame(pivot, sB, sA) : hingeFrame(pivot, sA, sB);
       this.add(surface([wst(1.0), wst(3.5), wst(6.95)], { u1: SL - 0.004, capStart: true, capEnd: true, mirror: m, matrix: slF.inv }), this.skin, slF.hinge);
@@ -550,7 +552,7 @@ export class F14Model {
     }
 
     // ---------------- Cockpit interior visible from outside: seats, consoles, crew ----------------
-    const seatMat = new THREE.MeshStandardMaterial({ color: 0x2c2e30, roughness: 0.85 });
+    const seatMat = new THREE.MeshStandardMaterial({ color: 0x3a3d40, roughness: 0.85 });
     const suit = new THREE.MeshStandardMaterial({ color: 0x4f5446, roughness: 0.9 });
     const helm = new THREE.MeshStandardMaterial({ color: 0xcfcbbd, roughness: 0.45 });
     const visor = new THREE.MeshStandardMaterial({ color: 0x1b1f22, roughness: 0.1, metalness: 0.6 });
@@ -684,8 +686,8 @@ export class F14Model {
     ck.add(comb);
     // Canopy sills inside the cockpit and the three rear-view mirrors on the windscreen bow.
     const mirMat = new THREE.MeshStandardMaterial({ color: 0x6d757c, metalness: 1, roughness: 0.25 });
-    for (const [y, z] of [[0, -1.27], [-0.36, -1.16], [0.36, -1.16]]) {
-      const mirror = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.11, 0.035), mirMat); mirror.position.set(5.68, y, z + 0.04); ck.add(mirror);
+    for (const [y, z] of [[0, -1.29], [-0.4, -1.12], [0.4, -1.12]]) {
+      const mirror = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.075, 0.026), mirMat); mirror.position.set(5.68, y, z + 0.04); ck.add(mirror);
     }
   }
 
@@ -788,7 +790,8 @@ export class F14Model {
       });
       const yc = side * (gy0 + gy1) / 2;
       for (const mesh of [this.gloves.find((g) => g.side === side).shelf, gl]) {
-        const d = this.decal(mesh, V3((gx0 + gx1) / 2, yc, -0.36), V3(0, 0, -1), V3(1, 0, 0), gx1 - gx0, gy1 - gy0, side > 0 ? gTex : gTex, { depth: 0.26 });
+        const d = this.decal(mesh, V3((gx0 + gx1) / 2, yc, -0.36), V3(0, 0, -1), V3(1, 0, 0), gx1 - gx0, gy1 - gy0, gTex, { depth: 0.26 });
+        // Seen from above with text-right = +x, decal up is -y; flip v on the left so both sides share one canvas.
         if (side < 0) d.geometry.attributes.uv.array.forEach((v, i, a) => { if (i % 2) a[i] = 1 - v; });
       }
     }
