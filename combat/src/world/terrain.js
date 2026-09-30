@@ -86,13 +86,14 @@ export class Terrain {
     const z = Math.min(node.z + 1, IMG_MAX_Z);
     const c = document.createElement('canvas'); c.width = c.height = 512;
     const ctx = c.getContext('2d');
+    ctx.fillStyle = '#12303d'; ctx.fillRect(0, 0, 512, 512); // sea color where imagery is missing offshore
     if (z === node.z + 1) {
       const jobs = [];
       for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++)
         jobs.push(loadImage(IMG_URL(z, node.x * 2 + dx, node.y * 2 + dy)).then((im) => ctx.drawImage(im, dx * 256, dy * 256)).catch(() => {}));
       await Promise.all(jobs);
     } else {
-      const im = await loadImage(IMG_URL(node.z, node.x, node.y)); ctx.drawImage(im, 0, 0, 512, 512);
+      try { const im = await loadImage(IMG_URL(node.z, node.x, node.y)); ctx.drawImage(im, 0, 0, 512, 512); } catch (e) { /* offshore: keep sea color */ }
     }
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = this.maxAniso;
@@ -115,7 +116,7 @@ export class Terrain {
       for (let i = 0; i < N; i++) {
         const lon = b.lonW + (b.lonE - b.lonW) * i / GRID;
         const en = llToEN(lat, lon);
-        let y = h[idx(i, j)]; if (y < 0) y = y * 0.2 - 3; // below the sea surface, keep it under the ocean
+        let y = h[idx(i, j)]; if (y < 0.5) y = Math.min(-6, y * 0.3 - 6); // seabed: keep it well under the ocean surface
         const k = idx(i, j) * 3;
         pos[k] = en.e - cx; pos[k + 1] = y; pos[k + 2] = -(en.n - cy);
         uv[idx(i, j) * 2] = i / GRID; uv[idx(i, j) * 2 + 1] = 1 - j / GRID;

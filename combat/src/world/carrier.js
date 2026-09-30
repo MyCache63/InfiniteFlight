@@ -187,6 +187,8 @@ export class Carrier {
   updateCat(dt, ac) {
     const c = this.cat; if (!c) return;
     const L = this.toLocal(ac.pos[0], ac.pos[1], ac.pos[2]);
+    // Safety: the catapult only acts on a jet sitting on its track.
+    if (Math.abs(L.y - c.y) > 6 || L.z - DECK_H > 6 || ac.crashed) { this.cat = null; ac.extForce = [0, 0, 0]; return; }
     const vs = this.shipVelNED(), vw = ac.vWorld;
     const fwd = [Math.cos(this.heading), Math.sin(this.heading)];
     const rel = (vw[0] - vs[0]) * fwd[0] + (vw[1] - vs[1]) * fwd[1];

@@ -66,6 +66,14 @@ export class Environment {
     this.sky = new Sky(); this.sky.scale.setScalar(4.5e5);
     const u = this.sky.material.uniforms;
     u.turbidity.value = 2.2; u.rayleigh.value = 1.9; u.mieCoefficient.value = 0.004; u.mieDirectionalG.value = 0.82;
+    // Deeper zenith at altitude: less air above you means a darker, more saturated blue overhead.
+    this.sky.material.uniforms.uAlt = { value: 0 };
+    this.sky.material.fragmentShader = 'uniform float uAlt;\n' + this.sky.material.fragmentShader.replace(
+      'gl_FragColor = vec4( retColor, 1.0 );',
+      `float elev = clamp(direction.y, 0.0, 1.0);
+       vec3 deep = vec3(0.10, 0.22, 0.52) * (0.6 + 0.4 * length(retColor));
+       retColor = mix(retColor, deep, uAlt * smoothstep(0.02, 0.7, elev) * 0.85);
+       gl_FragColor = vec4( retColor, 1.0 );`);
     scene.add(this.sky);
     this.sunDir = new THREE.Vector3();
     this.sun = new THREE.DirectionalLight(0xfff3e0, 3.0);
@@ -113,7 +121,7 @@ export class Environment {
   buildOcean() {
     const nrm = makeWaveNormals();
     // Radial grid: dense near the camera, coarse to the horizon (the mesh follows the camera).
-    const rings = 90, segs = 128, pos = [], idx = [];
+    const rings = 100, segs = 128, pos = [], idx = []; // reaches about 445 km, past the horizon from 40,000 ft
     for (let r = 0; r <= rings; r++) {
       const rad = r === 0 ? 0 : 6 * Math.pow(1.12, r - 1) - 5;
       for (let s = 0; s < segs; s++) { const a = s / segs * Math.PI * 2; pos.push(Math.cos(a) * rad, 0, Math.sin(a) * rad); }
@@ -147,7 +155,8 @@ export class Environment {
           vec2 s4 = texture2D(uNrm, (r1 * w) / 1900.0 + vec2(0.0007, 0.0003) * uTime).xy * 2.0 - 1.0;
           float fNear = 1.0 - smoothstep(150.0, 1800.0, dist);
           float fMid = 1.0 - smoothstep(1500.0, 9000.0, dist);
-          vec2 slope = s1 * 0.55 * fMid + s2 * 0.45 * fMid + s3 * 0.35 * fNear + s4 * 0.35;
+          float fFar = 1.0 - smoothstep(18000.0, 70000.0, dist);
+          vec2 slope = s1 * 0.55 * fMid + s2 * 0.45 * fMid + s3 * 0.35 * fNear + s4 * 0.35 * fFar;
           vec3 mapN = normalize(vec3(slope * normalScale, 1.0));
           normal = normalize( tbn * mapN );`)
         .replace('#include <opaque_fragment>', `
@@ -171,9 +180,12 @@ export class Environment {
     // Keep the ocean grid centered under the camera (snap to avoid swimming texture).
     this.ocean.position.set(Math.round(camPos.x / 50) * 50, 0, Math.round(camPos.z / 50) * 50);
     this.sky.position.copy(camPos);
-    // Thinner haze at altitude.
+    // Thinner haze and a deeper blue zenith at altitude.
     const alt = Math.max(0, camPos.y);
     this.scene.fog.density = 0.000032 * Math.exp(-alt / 5200) + 0.000004;
+    const hi = Math.min(1, alt / 11000), u = this.sky.material.uniforms;
+    u.turbidity.value = 2.2 - 1.2 * hi; u.mieCoefficient.value = 0.004 * (1 - 0.8 * hi); u.rayleigh.value = 1.9 - 0.9 * hi;
+    u.uAlt.value = Math.min(1, Math.max(0, (alt - 1500) / 11000));
   }
 
   placeSunShadow(target) {

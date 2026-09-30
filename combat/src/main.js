@@ -8,6 +8,7 @@ import { F14Model } from './aircraft/f14model.js';
 import { Input } from './input.js';
 import { HUD } from './hud.js';
 import { Audio } from './audio.js';
+import { Clouds } from './world/clouds.js';
 import { llToEN } from './world/geo.js';
 import { Carrier, DECK_H } from './world/carrier.js';
 import { trim } from './fdm/trim.js';
@@ -30,6 +31,8 @@ addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); ca
 
 const env = new Environment(scene, renderer);
 const terrain = new Terrain(scene, renderer);
+const clouds = new Clouds(scene);
+const cloudDrift = new THREE.Vector2();
 const model = new F14Model(); scene.add(model.root);
 const input = new Input();
 const hud = new HUD();
@@ -53,10 +56,21 @@ const surfaceQuery = (pw) => {
 const simEnv = { surface: surfaceQuery, agl: (p) => -p[2] - (carrier.surface(p)?.h ?? Math.max(0, terrain.heightAt(p[1], p[0]) ?? 0)), wind: windNED };
 
 // Start: 3,000 ft over the Pacific west of the Golden Gate, heading east at 300 kt.
+function placeTrimmed(pos, V, hdg) {
+  carrier.cat = null; carrier.trap = null; ac.extForce = [0, 0, 0]; ac.extMoment = [0, 0, 0];
+  ac.reset({ pos, V, heading: hdg, fuelKg: 6500 });
+  const t = trim({ V, h: -pos[2], massKg: ac.mass });
+  ac.q = qFromEuler(0, t.alpha * DEG, hdg);
+  ac.vel = [V * Math.cos(t.alpha * DEG), 0, V * Math.sin(t.alpha * DEG)];
+  ac.sweep = t.sweep; ac.ctl.trim = t.ds; ac.surf.ds = t.ds; ac.ctl.gear = 0; ac.gear = 0;
+  ac.ctl.throttle = input.throttle = Math.min(0.8, t.throttle); input.throttleAbs = null;
+  for (const e of [ac.engL, ac.engR]) { e.T = e.commandedDry(ac.ctl.throttle); e.Tdot = 0; e.ab = 0; }
+  // Beyond military thrust, light the afterburners.
+  if (t.throttle >= 0.79) { ac.ctl.throttle = input.throttle = 1; for (const e of [ac.engL, ac.engR]) { e.T = 12350 * 4.448; e.ab = 1; } }
+}
 function startAir() {
   const p = llToEN(37.79, -122.85);
-  ac.reset({ pos: [p.n, p.e, -3000 * FT], V: 300 * KT, heading: 80 * DEG, fuelKg: 6500 });
-  ac.ctl.throttle = input.throttle = 0.72; ac.ctl.gear = 0; ac.gear = 0; ac.ctl.trim = -3.5; ac.surf.ds = -3.5;
+  placeTrimmed([p.n, p.e, -3000 * FT], 300 * KT, 80 * DEG);
 }
 // In the groove: on glide slope and centerline, on-speed, hook and gear down, 3/4 nm behind the ramp.
 function startGroove(rangeM = 1400) {
@@ -84,13 +98,14 @@ function startGroove(rangeM = 1400) {
   ac.gear = 1; ac.flaps = 1; ac.slats = 1; ac.hookPos = 1; ac.sweep = 20; ac.surf.ds = t.ds; ac.ctl.trim = t.ds;
   for (const e of [ac.engL, ac.engR]) { e.T = e.commandedDry(t.throttle); e.Tdot = 0; e.ab = 0; }
   input.throttle = t.throttle; input.throttleAbs = null;
-  carrier.trap = null; carrier.cat = null; carrier.lso.pass = null; carrier.prevHookS = null;
+  carrier.trap = null; carrier.cat = null; ac.extForce = [0, 0, 0]; carrier.lso.pass = null; carrier.prevHookS = null; carrier.lso.captionT = 0;
   carrier.update(0, ac); // refresh hook geometry so nothing reads the pre-reset state
   mode = 'groove';
 }
 function startCat() { carrier.spotOnCat(ac, 1); input.throttle = 0.2; input.throttleAbs = null; mode = 'cat'; }
 // Case I break: 800 ft, 350 kt, overhead the ship heading along the ship's course, hook down.
 function startBreak() {
+  carrier.cat = null; carrier.trap = null; ac.extForce = [0, 0, 0];
   const w = carrier.toWorld(-2200, 800, 800 * FT);
   ac.reset({ pos: w, V: 350 * KT, heading: carrier.heading, fuelKg: 4000 });
   const t = trim({ V: 350 * KT, h: 250, massKg: ac.mass });
@@ -217,14 +232,21 @@ function render(dt) {
     else camera.position.copy(target);
     camera.lookAt(p.clone().addScaledVector(new THREE.Vector3(0, 1, 0), 2));
   }
+  // Keep the camera above the ground and the sea.
+  const gc = Math.max(0, terrain.heightAt(camera.position.x, -camera.position.z) ?? 0);
+  const deckC = carrier.surface([-camera.position.z, camera.position.x, -camera.position.y]);
+  const floor = Math.max(gc, deckC ? deckC.h : 0) + 1.5;
+  if (camera.position.y < floor) camera.position.y = floor;
   camera.updateProjectionMatrix();
   env.update(dt, camera.position);
   env.placeSunShadow(p);
+  cloudDrift.x += dt * 4; clouds.update(camera.position, env.sunDir, env.sun.color, cloudDrift);
   terrain.update(camera.position.x, -camera.position.z, camera.position.y);
   renderer.render(scene, camera);
   audio.update(ac, viewMode === 'cockpit');
   const agl = simEnv.agl(ac.pos) / FT;
-  hud.draw(ac, camera, viewMode === 'cockpit' || viewMode === 'chase' ? viewMode : 'none', {
+  const hideUI = document.body.classList.contains('hideui');
+  hud.draw(ac, camera, !hideUI && (viewMode === 'cockpit' || viewMode === 'chase') ? viewMode : 'none', {
     radarAlt: agl, message: ac.crashed ? ac.crashReason.toUpperCase() + '  (R to restart)' : paused ? 'PAUSED' : carrier.trap?.stopped ? 'TRAPPED  ' + carrier.trap.wire + ' WIRE' : '',
     lso: carrier.lso.captionT > 0 ? 'LSO: ' + carrier.lso.caption : '', board: carrier.lso.board, ball: showBall ? carrier.ballCells(ac) : undefined });
   stamp.textContent = `${VERSION} · ${BUILD}${input.joy !== null ? ' · STICK ' + (input.customMap ? 'CAL' : 'DEFAULT MAP') : ''}`;
@@ -237,7 +259,7 @@ paused = true;
 
 // Debug and screenshot API.
 window.IFC = {
-  ac, env, terrain, camera, scene, renderer, model, input,
+  ac, env, terrain, clouds, camera, scene, renderer, model, input,
   setView(v) { viewMode = v; },
   setFreeze(f) { freeze = f; paused = false; },
   advance(sec) { const n = Math.round(sec / DT); for (let i = 0; i < n; i++) { carrier.update(DT, ac); ac.step(DT, simEnv); t += DT; } },
@@ -246,9 +268,11 @@ window.IFC = {
   apState,
   trace(sec, every = 1) { const out = []; const n = Math.round(sec / DT); for (let i = 0; i < n; i++) { approachPilot(DT); carrier.update(DT, ac); ac.step(DT, simEnv); t += DT; if (i % Math.round(every / DT) === 0) { const h = carrier.hookInfo || {}; out.push([+(i * DT).toFixed(1), Math.round(h.s), +(h.lat ?? 0).toFixed(1), +(h.h ?? 0).toFixed(1), +(carrier.ballCells(ac) ?? 0).toFixed(2), +ac.aoaUnits.toFixed(1), +(ac.euler.theta / DEG).toFixed(1), +(ac.euler.phi / DEG).toFixed(1), +ac.ctl.throttle.toFixed(2), Math.round(ac.V / KT)]); } } return out; },
   stepAuto(sec) { const n = Math.round(sec / DT); for (let i = 0; i < n; i++) { approachPilot(DT); carrier.update(DT, ac); ac.step(DT, simEnv); t += DT; } },
-  place({ lat, lon, altFt, kt, hdg, pitch = 0 }) {
+  place({ lat, lon, altFt, kt, hdg }) {
     const q = llToEN(lat, lon);
-    ac.reset({ pos: [q.n, q.e, -altFt * FT], V: kt * KT, heading: hdg * DEG, pitch: pitch * DEG, fuelKg: 6500 });
+    const ground = Math.max(0, terrain.heightAt(q.e, q.n) ?? 0);
+    const alt = Math.max(altFt * FT, ground + 1000 * FT);
+    placeTrimmed([q.n, q.e, -alt], kt * KT, hdg * DEG);
   },
   cam(o) { Object.assign(camState, o); },
   terrainReady() { return { loaded: terrain.loadedCount, inflight: terrain.inflight, queued: terrain.queue.length, failed: terrain.failed }; },

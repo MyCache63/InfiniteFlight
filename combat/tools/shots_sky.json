@@ -1,0 +1,4 @@
+[
+ {"name": "h1_38k", "time": 14.5, "place": {"lat": 37.6, "lon": -123.4, "altFt": 38000, "kt": 520, "hdg": 270}, "view": "chase", "cam": {"yaw": 0.6, "pitch": 0.05, "dist": 30}, "advance": 0.5, "wait": 6, "hideui": true},
+ {"name": "h2_20k", "time": 14.5, "place": {"lat": 37.6, "lon": -123.4, "altFt": 20000, "kt": 450, "hdg": 270}, "view": "chase", "cam": {"yaw": 0.6, "pitch": 0.05, "dist": 30}, "advance": 0.5, "wait": 6, "hideui": true}
+]

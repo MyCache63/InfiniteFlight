@@ -1,0 +1,5 @@
+[
+ {"name": "k1_groove", "setup": "IFC.startGroove(1200)", "view": "chase", "cam": {"yaw": 0.25, "pitch": -0.1, "dist": 38}, "advance": 0.05, "wait": 5, "hideui": true},
+ {"name": "k2_above", "place": {"lat": 37.7, "lon": -123.0, "altFt": 12000, "kt": 350, "hdg": 60}, "view": "chase", "cam": {"yaw": 0.4, "pitch": -0.25, "dist": 34}, "advance": 0.2, "wait": 8, "hideui": true},
+ {"name": "k3_sunset", "time": 18.5, "place": {"lat": 37.7, "lon": -123.0, "altFt": 4000, "kt": 350, "hdg": 250}, "view": "chase", "cam": {"yaw": 0.2, "pitch": -0.05, "dist": 34}, "advance": 0.2, "wait": 8, "hideui": true}
+]
