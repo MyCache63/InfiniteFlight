@@ -18,8 +18,8 @@ import { Carrier, DECK_H } from './world/carrier.js';
 import { trim } from './fdm/trim.js';
 import { qinvrot, qFromEuler } from './fdm/fdm.js';
 
-export const VERSION = 'v00.3.0';
-export const BUILD = '2026-09-30 16:10 PT';
+export const VERSION = 'v00.3.1';
+export const BUILD = '2026-09-30 17:05 PT';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(2, devicePixelRatio));
@@ -183,6 +183,7 @@ function handleKeys() {
     if (code === 'Digit3') startBreak();
     if (code === 'Digit0') { startAir(); mode = 'free'; }
     if (code === 'KeyM') showBall = !showBall;
+    if (code === 'Slash') help.hidden = !help.hidden;
     if (code === 'KeyA' && input.keys.ShiftLeft) autoApproach = !autoApproach;
     if (code === 'KeyP') paused = !paused;
     if (code === 'BracketLeft') c.trim = Math.min(10, c.trim + 0.5);
@@ -265,6 +266,8 @@ function render(dt) {
 
 const stamp = document.getElementById('stamp');
 const menu = document.getElementById('menu');
+const help = document.getElementById('help');
+setTimeout(() => { help.hidden = true; }, 20000); // key help fades after 20 s; press / to bring it back
 menu.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { input.edges.push(b.dataset.k); }));
 paused = true;
 

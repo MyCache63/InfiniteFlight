@@ -116,7 +116,7 @@ export class Terrain {
       for (let i = 0; i < N; i++) {
         const lon = b.lonW + (b.lonE - b.lonW) * i / GRID;
         const en = llToEN(lat, lon);
-        let y = h[idx(i, j)]; if (y < 0.5) y = Math.min(-6, y * 0.3 - 6); // seabed: keep it well under the ocean surface
+        let y = h[idx(i, j)]; if (y < 0.5) y = Math.min(-60, y * 0.3 - 60); // seabed: keep it well under the ocean surface
         const k = idx(i, j) * 3;
         pos[k] = en.e - cx; pos[k + 1] = y; pos[k + 2] = -(en.n - cy);
         uv[idx(i, j) * 2] = i / GRID; uv[idx(i, j) * 2 + 1] = 1 - j / GRID;
@@ -164,7 +164,7 @@ export class Terrain {
     // Imagery already contains real shadows; soften the extra lighting so relief reads without doubling.
     m.userData.onShader = (sh) => {
       sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>', `
-        outgoingLight = mix( diffuseColor.rgb * 0.62, outgoingLight, 0.55 );
+        outgoingLight = mix( diffuseColor.rgb * 0.9, outgoingLight * 1.15, 0.5 );
         #include <opaque_fragment>`);
     };
     return patchCurvature(m);

@@ -175,7 +175,7 @@ export class Carrier {
   // Put the jet on catapult 1 (bow, starboard), tensioned. Launch when throttle is at MIL or above for 2 s.
   spotOnCat(ac, n = 1) {
     const y = n === 1 ? 8 : -8;
-    const x0 = 150 - CAT_STROKE - 2;
+    const x0 = 158 - CAT_STROKE - 2; // bow cats end just short of the bow
     const pw = this.toWorld(x0, y, DECK_H + 2.0);
     const hdg = this.heading;
     ac.reset({ pos: pw, V: this.speed, heading: hdg, fuelKg: 5500, onGround: true });
@@ -249,7 +249,7 @@ export class Carrier {
     const radar = box(0.3, 3, 6, 18, DECK_H + 36, 31); this.radar = radar;
     box(4, 3, 4, 26, DECK_H + 23, 31);
     // Deck-edge elevators (lighter squares) and catwalk nets, as shading on the texture; add jet blast deflectors.
-    for (const [x, z] of [[150 - 309.7 * FT - 12, -8], [150 - 309.7 * FT - 12, 8]]) {
+    for (const [x, z] of [[158 - 309.7 * FT - 10, -8], [158 - 309.7 * FT - 10, 8]]) {
       const jbd = new THREE.Mesh(new THREE.BoxGeometry(0.4, 3.2, 12), hullMat); jbd.position.set(x, DECK_H + 1.1, z); jbd.rotation.z = 0.9; this.shipRoot.add(jbd);
     }
     // Arresting wires: thin cables across the landing area just above the deck.
@@ -376,7 +376,7 @@ export class Carrier {
     for (let i = 0; i < 900; i++) { x.fillStyle = `rgba(${120 + Math.random() * 40},${100 + Math.random() * 30},${70 + Math.random() * 20},${0.03 + Math.random() * 0.05})`; x.beginPath(); x.ellipse(Math.random() * W, Math.random() * H, 10 + Math.random() * 60, 4 + Math.random() * 20, Math.random() * 3, 0, 6.28); x.fill(); }
     const P = (s, lat) => { const p = this.landingPoint(s, lat); return [X(p[0]), Y(p[1])]; };
     x.save();
-    for (let i = 0; i < 160; i++) { const [px, py] = P(35 + Math.random() * 110, (Math.random() - 0.5) * 9); x.fillStyle = 'rgba(12,12,12,0.22)'; x.beginPath(); x.ellipse(px, py, 40 + Math.random() * 90, 4 + Math.random() * 6, -ANG, 0, 6.28); x.fill(); }
+    for (let i = 0; i < 260; i++) { const [px, py] = P(45 + Math.random() * 60 + Math.random() * 40, (Math.random() - 0.5) * 6); x.fillStyle = `rgba(10,10,10,${0.12 + Math.random() * 0.15})`; x.beginPath(); x.ellipse(px, py, 8 + Math.random() * 30, 1.5 + Math.random() * 2.5, -ANG, 0, 6.28); x.fill(); }
     x.restore();
     const line = (a, b, col, w, dash) => { x.strokeStyle = col; x.lineWidth = w; x.setLineDash(dash || []); x.beginPath(); x.moveTo(...a); x.lineTo(...b); x.stroke(); x.setLineDash([]); };
     // Landing area edge lines (white), centerline (white dashed), foul lines (red/white).
@@ -386,7 +386,7 @@ export class Carrier {
     // Ramp stripes.
     for (let k = -12; k < 12; k += 3) line(P(0, k), P(6, k + 1.5), '#e8e6dc', 8);
     // Bow catapult tracks and a waist cat.
-    for (const yy of [8, -8]) { line([X(150 - CAT_STROKE - 3), Y(yy)], [X(152), Y(yy)], '#2a2c2e', 10); line([X(150 - CAT_STROKE - 3), Y(yy)], [X(152), Y(yy)], '#b8a42c', 2, [18, 18]); }
+    for (const yy of [8, -8]) { line([X(158 - CAT_STROKE - 3), Y(yy)], [X(160), Y(yy)], "#1f2123", 10); line([X(158 - CAT_STROKE - 3), Y(yy)], [X(160), Y(yy)], "#9c9068", 2, [18, 18]); }
     line(P(120, -22), P(215, -22), '#2a2c2e', 10);
     // Deck numbers at the bow and a yellow taxi line.
     x.fillStyle = '#e8e6dc'; x.font = 'bold 150px Arial'; x.textAlign = 'center';

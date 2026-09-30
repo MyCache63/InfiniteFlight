@@ -247,7 +247,7 @@ export class F14Model {
     triplanar(this.radome, tex, 1 / 6);
     this.dark = new THREE.MeshStandardMaterial({ color: 0x25282c, roughness: 0.7, metalness: 0.2 });
     this.intakeMat = new THREE.MeshStandardMaterial({ color: 0x8a9095, roughness: 0.75, metalness: 0.05, envMapIntensity: 0.35 });
-    this.frame = new THREE.MeshStandardMaterial({ color: 0x3b4046, roughness: 0.55, metalness: 0.3 });
+    this.frame = new THREE.MeshStandardMaterial({ color: 0x23262a, roughness: 0.85, metalness: 0.1 });
     this.metal = new THREE.MeshStandardMaterial({ color: 0x5b5752, roughness: 0.42, metalness: 0.85 });
     this.hot = new THREE.MeshStandardMaterial({ color: 0x2d2a28, roughness: 0.6, metalness: 0.6 });
     this.white = new THREE.MeshStandardMaterial({ color: 0xdcdad4, roughness: 0.5, metalness: 0.1 });
@@ -329,12 +329,12 @@ export class F14Model {
       bow.push(cPt(5.72, yy * CP.w(5.72) * 0.985, Math.sign(yy) || 1));
       aft.push(cPt(2.0, yy * CP.w(2.0) * 0.98, Math.sign(yy) || 1));
     }
-    this.add(tube(bow, 0.024), this.frame);
+    this.add(tube(bow, 0.017), this.frame);
     this.add(tube(aft, 0.03), this.frame);
     for (const side of [-1, 1]) {
       const post = [], rail = [];
       for (let k = 0; k <= 10; k++) { const x = lerp(6.7, 5.72, k / 10); post.push(cPt(x, lerp(0.22, 0.32, k / 10), side, 0.01)); }
-      this.add(tube(post, 0.02, 16), this.frame);
+      this.add(tube(post, 0.013, 16), this.frame);
       for (let k = 0; k <= 30; k++) { const x = lerp(6.72, 1.95, k / 30); rail.push(V3(x, side * (CP.w(x) + 0.005), SILL + 0.03)); }
       this.add(tube(rail, 0.035, 60), this.frame);
       // Windscreen base frame.
@@ -674,8 +674,7 @@ export class F14Model {
     x.fillStyle = '#050706'; x.fillRect(412, 252, 200, 120); x.strokeStyle = '#555c62'; x.strokeRect(412, 252, 200, 120);
     dial(300, 110, 62, 'AIRSPEED'); dial(300, 260, 55, 'AOA'); dial(724, 110, 62, 'ALT'); dial(724, 260, 55, 'VVI');
     dial(150, 120, 48, 'RPM L'); dial(150, 250, 48, 'RPM R'); dial(874, 120, 48, 'FUEL'); dial(874, 250, 48, 'G');
-    x.fillStyle = '#b8b020'; x.fillRect(470, 8, 84, 24); x.fillStyle = '#111'; x.font = 'bold 16px Arial'; x.textAlign = 'center'; x.fillText('MASTER ARM', 512, 26);
-    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+        const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
     this.panelCanvas = c; this.panelTex = tex;
     const panelMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8, metalness: 0.1, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.18 });
     const panel = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.37), panelMat);

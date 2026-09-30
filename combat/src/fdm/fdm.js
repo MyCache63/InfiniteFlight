@@ -55,7 +55,7 @@ const HARD = [[9.5, 0, 0.6], [-9.0, 0, -0.2], [2.0, 0, 1.2], [-2.0, -9.6, 0.4], 
 // but is not a crash by itself.
 const SCRAPE = [[-5.2, -1.35, 1.45], [-5.2, 1.35, 1.45], [-9.4, -1.35, 1.05], [-9.4, 1.35, 1.05]];
 export const HOOK_POINT = [-7.9, 0, 1.55]; // tailhook tip when down (EST)
-export const EYE_POINT = [5.2, 0, -1.15];  // pilot eye (EST)
+export const EYE_POINT = [4.98, 0, -1.12];  // pilot eye, at the front-seat helmet in the model (EST)
 
 const EMPTY_KG = 44531 * LBM; // TM-81833 operating empty weight
 export const FUEL_MAX_KG = 16200 * LBM; // F-14A internal fuel (published)
