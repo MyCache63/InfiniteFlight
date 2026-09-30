@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>F-14 Model Viewer</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #b9c7d3; }
+  canvas { display: block; }
+  #info { position: fixed; left: 10px; top: 8px; font: 12px Menlo, monospace; color: #1d2a33; background: rgba(255,255,255,0.55); padding: 6px 8px; border-radius: 3px; }
+  body.hideui #info { display: none; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="info">F-14 model viewer. Keys: 1 side, 2 top, 3 front, 4 rear, 5-8 three-quarter views, 9 cockpit, G gear, W sweep, F flaps, B speed brake, H hook, A afterburner. Drag to orbit.</div>
+<script type="module">
+import * as THREE from 'three';
+import { Sky } from 'three/addons/objects/Sky.js';
+import { F14Model } from '../src/aircraft/f14model.js';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.62;  // same as main.js
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xb9c7d3);
+// Lighting copied from combat/src/world/environment.js at 15:30 (sun elevation about 38 deg), so the paint
+// reads here the way it will in the sim: Preetham sky environment, sun 3.2, hemisphere 0.9.
+const B0 = (x, y, z) => new THREE.Vector3(y, -z, -x);
+const sunDir = B0(0.45, -0.62, -0.64).normalize();
+{
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const skyScene = new THREE.Scene(); const sky = new Sky(); sky.scale.setScalar(1000);
+  const u = sky.material.uniforms; u.turbidity.value = 3.2; u.rayleigh.value = 1.25; u.mieCoefficient.value = 0.004; u.mieDirectionalG.value = 0.82;
+  u.sunPosition.value.copy(sunDir); skyScene.add(sky);
+  skyScene.add(new THREE.Mesh(new THREE.SphereGeometry(900, 16, 8, 0, Math.PI * 2, Math.PI / 2 + 0.02, Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x5d7488, side: THREE.BackSide })));
+  scene.environment = pmrem.fromScene(skyScene, 0.02).texture;
+}
+
+// Body axes (x fwd, y right, z down) to three.js (x east, y up, z south), same as main.js.
+const qC = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().set(0, 1, 0, 0, 0, 0, -1, 0, -1, 0, 0, 0, 0, 0, 0, 1));
+const B = (x, y, z) => new THREE.Vector3(y, -z, -x);
+const GROUND_Z = 2.05; // body z of the ground with the gear down and compressed
+
+const model = new F14Model();
+model.root.quaternion.copy(qC);
+scene.add(model.root);
+
+const sun = new THREE.DirectionalLight(0xfff3e6, 3.2);
+sun.position.copy(sunDir.clone().multiplyScalar(30)); sun.castShadow = true;
+sun.shadow.mapSize.set(4096, 4096);
+Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14, near: 1, far: 60 });
+sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02;
+scene.add(sun);
+scene.add(new THREE.HemisphereLight(0xbfd6ff, 0x5a5448, 0.9));
+
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshStandardMaterial({ color: 0x8c8d86, roughness: 0.95 }));
+ground.rotation.x = -Math.PI / 2; ground.position.y = -GROUND_Z; ground.receiveShadow = true; scene.add(ground);
+const grid = new THREE.GridHelper(40, 40, 0x6a6c68, 0x7c7e79); grid.position.y = -GROUND_Z + 0.002; scene.add(grid);
+
+const persp = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.05, 500);
+const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
+let cam = persp;
+
+const state = { sweep: 20, gear: 1, flaps: 0, slats: 0, speedbrake: 0, hookPos: 0, ab: 0, ds: 0, da: 0, dr: 0, sp: 0, view: 'q1', cockpit: false, showGround: true };
+const ac = () => ({ sweep: state.sweep, gear: state.gear, flaps: state.flaps, slats: state.slats, speedbrake: state.speedbrake, hookPos: state.hookPos,
+  engL: { ab: state.ab }, engR: { ab: state.ab }, surf: { ds: state.ds, da: state.da, dr: state.dr, sp: state.sp }, ctl: { dlc: 0 } });
+
+// Views: position and target in body axes. Ortho views frame a fixed half-height.
+const VIEWS = {
+  side:  { ortho: true, pos: [0, -40, 0], tgt: [0, 0, 0], up: [0, 0, -1], half: 6.0 },
+  top:   { ortho: true, pos: [0, 0, -40], tgt: [0, 0, 0], up: [0, 1, 0], half: 11 },
+  front: { ortho: true, pos: [40, 0, 0], tgt: [0, 0, 0], up: [0, 0, -1], half: 6.0 },
+  rear:  { ortho: true, pos: [-40, 0, 0], tgt: [0, 0, 0], up: [0, 0, -1], half: 6.0 },
+  q1:    { pos: [20, 18, -9], tgt: [-0.5, 0, 0.2], up: [0, 0, -1] },          // front right, above
+  q2:    { pos: [-21, -17, -10.5], tgt: [-0.5, 0, 0.2], up: [0, 0, -1] },        // rear left, above
+  q3:    { pos: [22, -20, 1.2], tgt: [0, 0, 0.1], up: [0, 0, -1] },            // front left, low
+  q4:    { pos: [-8, 23, -2.5], tgt: [-1, 0, 0], up: [0, 0, -1] },              // right side, slightly aft
+  top34: { pos: [8, 16, -30], tgt: [-1, 0, 0], up: [0, 0, -1] },
+  under: { pos: [10, -18, 14], tgt: [-1, 0, 0.3], up: [0, 0, -1] },
+  nose:  { pos: [12, 5, -2.2], tgt: [5.0, 0, -0.4], up: [0, 0, -1] },           // close on nose and canopy
+  intake:{ pos: [9, 6.5, 0.6], tgt: [2.8, 1.4, 0.1], up: [0, 0, -1] },
+  tail:  { pos: [-17, 8, -5], tgt: [-7.5, 0, -0.5], up: [0, 0, -1] },
+  sbk:   { pos: [-15, -6, -8], tgt: [-7.2, 0, -0.3], up: [0, 0, -1] },
+  hookv: { pos: [-13, -8, 1.6], tgt: [-6.5, 0, 0.6], up: [0, 0, -1] },
+  wingc: { pos: [-4, 12, -5], tgt: [-3, 5, 0], up: [0, 0, -1] },
+  cockpit: { pos: [5.2, 0, -1.15], tgt: [15, 0, -0.9], up: [0, 0, -1], fov: 70 },
+  rearseat: { pos: [3.75, 0, -1.1], tgt: [15, 0, -1.4], up: [0, 0, -1], fov: 70 },
+};
+
+function applyView() {
+  const v = VIEWS[state.view] || VIEWS.q1;
+  cam = v.ortho ? ortho : persp;
+  const a = innerWidth / innerHeight;
+  if (v.ortho) { ortho.top = v.half; ortho.bottom = -v.half; ortho.left = -v.half * a; ortho.right = v.half * a; ortho.updateProjectionMatrix(); }
+  else { persp.fov = v.fov || 30; persp.aspect = a; persp.updateProjectionMatrix(); }
+  const p = orbit.active ? orbit.pos() : B(...v.pos);
+  cam.position.copy(p); cam.up.copy(B(...v.up).normalize()); cam.lookAt(B(...v.tgt));
+  model.setCockpitView(state.view === 'cockpit');
+  ground.visible = grid.visible = state.showGround && state.view !== 'top';
+  model.root.position.set(0, 0, 0);
+}
+
+const orbit = { active: false, yaw: 0.8, pitch: 0.35, dist: 34, pos() { return B(Math.cos(this.yaw) * Math.cos(this.pitch) * this.dist, Math.sin(this.yaw) * Math.cos(this.pitch) * this.dist, -Math.sin(this.pitch) * this.dist); } };
+let drag = null;
+renderer.domElement.addEventListener('mousedown', (e) => { drag = [e.clientX, e.clientY]; orbit.active = true; state.view = 'q1'; });
+addEventListener('mouseup', () => { drag = null; });
+addEventListener('mousemove', (e) => { if (!drag) return; orbit.yaw -= (e.clientX - drag[0]) * 0.006; orbit.pitch = Math.max(-1.4, Math.min(1.4, orbit.pitch + (e.clientY - drag[1]) * 0.006)); drag = [e.clientX, e.clientY]; });
+addEventListener('wheel', (e) => { orbit.dist *= Math.exp(e.deltaY * 0.001); });
+addEventListener('keydown', (e) => {
+  const k = e.key.toLowerCase();
+  const map = { 1: 'side', 2: 'top', 3: 'front', 4: 'rear', 5: 'q1', 6: 'q2', 7: 'q3', 8: 'q4', 9: 'cockpit' };
+  if (map[k]) { state.view = map[k]; orbit.active = false; }
+  if (k === 'g') state.gear = state.gear > 0.5 ? 0 : 1;
+  if (k === 'w') state.sweep = state.sweep < 40 ? 68 : 20;
+  if (k === 'f') { state.flaps = state.flaps > 0.5 ? 0 : 1; state.slats = state.flaps; }
+  if (k === 'b') state.speedbrake = state.speedbrake > 0.5 ? 0 : 1;
+  if (k === 'h') state.hookPos = state.hookPos > 0.5 ? 0 : 1;
+  if (k === 'a') state.ab = state.ab > 0.5 ? 0 : 1;
+});
+addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); });
+
+let t = 0, frames = 0, tris = 0;
+function frame(now) {
+  t = now / 1000;
+  model.update(ac(), t);
+  applyView();
+  renderer.render(scene, cam);
+  tris = renderer.info.render.triangles; frames++;
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+window.V = {
+  set(o) { Object.assign(state, o); orbit.active = false; },
+  info() { return { tris, calls: renderer.info.render.calls, frames }; },
+  model, renderer, THREE,
+};
+window.VREADY = true;
+</script>
+</body>
+</html>
