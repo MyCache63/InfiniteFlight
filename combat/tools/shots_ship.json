@@ -1,0 +1,6 @@
+[
+ {"name": "s1_ship_high_aft", "setup": "IFC.startGroove(900)", "view": "orbit", "cam": {"yaw": 0.0, "pitch": -0.5, "dist": 300}, "advance": 0.05, "wait": 6, "hideui": true},
+ {"name": "s2_ship_beam", "setup": "IFC.startCat()", "view": "orbit", "cam": {"yaw": 1.8, "pitch": -0.35, "dist": 330}, "advance": 0.05, "wait": 6, "hideui": true},
+ {"name": "s3_cat_close", "setup": "IFC.startCat()", "view": "orbit", "cam": {"yaw": 2.5, "pitch": -0.3, "dist": 38}, "advance": 0.05, "wait": 6, "hideui": true},
+ {"name": "s4_groove_cockpit_zoom", "setup": "IFC.startGroove(700); IFC.camera.fov=30", "view": "cockpit", "advance": 0.05, "wait": 6, "hideui": true}
+]

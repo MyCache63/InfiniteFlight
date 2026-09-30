@@ -7,6 +7,7 @@ import { Environment } from './world/environment.js';
 import { F14Model } from './aircraft/f14model.js';
 import { Input } from './input.js';
 import { HUD } from './hud.js';
+import { Audio } from './audio.js';
 import { llToEN } from './world/geo.js';
 import { Carrier, DECK_H } from './world/carrier.js';
 import { trim } from './fdm/trim.js';
@@ -32,9 +33,11 @@ const terrain = new Terrain(scene, renderer);
 const model = new F14Model(); scene.add(model.root);
 const input = new Input();
 const hud = new HUD();
+const audio = new Audio();
 const ac = new F14();
 const carrier = new Carrier(scene, { lat: 37.70, lon: -123.10, heading: 320, speedKt: 22 });
 carrier.naturalWindKt = 10;
+carrier.onEvent = (e) => { if (e === 'trap') audio.burst({ f: 55, dur: 1.1, gain: 1.3 }); if (e === 'cat') audio.burst({ f: 200, dur: 2.4, gain: 0.9, type: 'bandpass', sweep: 900 }); };
 const windNED = [-10 * KT * Math.cos(carrier.heading), -10 * KT * Math.sin(carrier.heading), 0];
 
 // NED -> three.js basis: x = east, y = up, z = south.
@@ -147,6 +150,8 @@ function handleKeys() {
     if (code === 'KeyB') c.speedbrake = c.speedbrake ? 0 : 1;
     if (code === 'KeyV') { viewMode = views[(views.indexOf(viewMode) + 1) % views.length]; camState.flyby = null; }
     if (code === 'KeyR') ({ groove: startGroove, cat: startCat, break: startBreak, free: startAir })[mode]();
+    if (code === 'Escape') { menu.hidden = !menu.hidden; paused = !menu.hidden; }
+    if (['Digit1', 'Digit2', 'Digit3', 'Digit0'].includes(code)) { menu.hidden = true; paused = false; }
     if (code === 'Digit1') startGroove();
     if (code === 'Digit2') startCat();
     if (code === 'Digit3') startBreak();
@@ -206,7 +211,7 @@ function render(dt) {
     camera.fov = 58;
     const yaw = Math.atan2(fwd.x, fwd.z) + camState.yaw;
     const d = camState.dist;
-    const off = new THREE.Vector3(Math.sin(yaw) * Math.cos(camState.pitch), Math.sin(-camState.pitch), Math.cos(yaw) * Math.cos(camState.pitch)).multiplyScalar(-d);
+    const off = new THREE.Vector3(Math.sin(yaw) * Math.cos(camState.pitch) * -d, -Math.sin(camState.pitch) * d, Math.cos(yaw) * Math.cos(camState.pitch) * -d); // pitch < 0 looks down from above
     const target = p.clone().add(off);
     if (viewMode === 'chase') { camState.smooth.lerp(target, 1 - Math.exp(-dt * 6)); if (camState.smooth.distanceTo(p) > d * 4) camState.smooth.copy(target); camera.position.copy(camState.smooth); }
     else camera.position.copy(target);
@@ -217,6 +222,7 @@ function render(dt) {
   env.placeSunShadow(p);
   terrain.update(camera.position.x, -camera.position.z, camera.position.y);
   renderer.render(scene, camera);
+  audio.update(ac, viewMode === 'cockpit');
   const agl = simEnv.agl(ac.pos) / FT;
   hud.draw(ac, camera, viewMode === 'cockpit' || viewMode === 'chase' ? viewMode : 'none', {
     radarAlt: agl, message: ac.crashed ? ac.crashReason.toUpperCase() + '  (R to restart)' : paused ? 'PAUSED' : carrier.trap?.stopped ? 'TRAPPED  ' + carrier.trap.wire + ' WIRE' : '',
@@ -225,6 +231,9 @@ function render(dt) {
 }
 
 const stamp = document.getElementById('stamp');
+const menu = document.getElementById('menu');
+menu.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { input.edges.push(b.dataset.k); }));
+paused = true;
 
 // Debug and screenshot API.
 window.IFC = {

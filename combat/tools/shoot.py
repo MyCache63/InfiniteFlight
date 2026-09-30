@@ -31,7 +31,7 @@ with sync_playwright() as p:
     print('renderer:', pg.evaluate("""() => { const gl = IFC.renderer.getContext(); const e = gl.getExtension('WEBGL_debug_renderer_info'); return e ? gl.getParameter(e.UNMASKED_RENDERER_WEBGL) : 'unknown'; }"""))
     for s in shots:
         pg.evaluate("""(s) => {
-          document.body.classList.toggle('hideui', !!s.hideui);
+          document.body.classList.toggle('hideui', !!s.hideui); const mn = document.getElementById('menu'); if (mn) mn.hidden = true;
           if (s.time !== undefined) IFC.env.setTimeOfDay(s.time);
           if (s.place) IFC.place(s.place);
           if (s.setup) (new Function('IFC', s.setup))(IFC);

@@ -11,7 +11,15 @@
   canvas { display: block; }
   #stamp { position: fixed; right: 10px; bottom: 8px; z-index: 6; font: 11px "IBM Plex Mono", Menlo, monospace; color: rgba(200,230,210,0.75); pointer-events: none; }
   #help { position: fixed; left: 12px; top: 10px; z-index: 6; font: 12px/1.5 "IBM Plex Mono", Menlo, monospace; color: rgba(210,235,220,0.8); background: rgba(8,16,14,0.45); padding: 8px 10px; border-radius: 3px; pointer-events: none; }
-  body.hideui #help, body.hideui #stamp { display: none; }
+  body.hideui #help, body.hideui #stamp, body.hideui #menu { display: none; }
+  #menu { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 8; width: min(640px, 92vw); background: rgba(8,16,20,0.82); color: #dfe9e4; font: 14px/1.5 "IBM Plex Mono", Menlo, monospace; padding: 22px 24px; border: 1px solid rgba(125,255,168,0.35); border-radius: 4px; }
+  #menu h1 { margin: 0 0 4px; font-size: 22px; color: #7dffa8; letter-spacing: .04em; }
+  #menu .opts { display: grid; gap: 8px; margin: 14px 0; }
+  #menu button { text-align: left; font: inherit; color: inherit; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.14); padding: 9px 12px; cursor: pointer; border-radius: 3px; display: grid; grid-template-columns: 28px 1fr; column-gap: 8px; }
+  #menu button:hover, #menu button:focus-visible { border-color: #7dffa8; outline: none; }
+  #menu button b { color: #7dffa8; grid-row: span 2; } #menu button span { color: #9fb2aa; font-size: 12px; }
+  #menu .small { color: #9fb2aa; font-size: 12px; margin: 0; }
+  #menu[hidden] { display: none; }
 </style>
 <script type="importmap">
 { "imports": {
@@ -21,7 +29,18 @@
 </script>
 </head>
 <body>
-<div id="help">Arrows pitch/roll · Q/E rudder · W/S throttle (past 80% = afterburner) · [ ] trim<br>G gear · F flaps · H hook · B speed brake · Space brakes · V view · T time · R restart · P pause</div>
+<div id="help">Arrows pitch/roll · Q/E rudder · W/S throttle (past 80% = afterburner) · [ ] trim · Z zoom<br>G gear · F flaps · H hook · B speed brake · Space brakes · V view · T time · R restart · P pause<br>1 in the groove · 2 catapult · 3 Case I break · 0 free flight · M lens repeater (assist) · Shift+A demo pass · Esc menu</div>
+<div id="menu">
+  <h1>Carrier Qualification</h1>
+  <p>F-14A Tomcat &middot; Nimitz-class carrier, 20 nm west of the Golden Gate &middot; wind 10 kt, ship 22 kt</p>
+  <div class="opts">
+    <button data-k="Digit1"><b>1</b> In the groove<span>3/4 mile, on speed, hook down</span></button>
+    <button data-k="Digit2"><b>2</b> On the catapult<span>Bow cat 1. Military power for 2 s to launch</span></button>
+    <button data-k="Digit3"><b>3</b> Case I break<span>800 ft, 350 kt overhead, fly the pattern</span></button>
+    <button data-k="Digit0"><b>0</b> Free flight<span>3,000 ft off the Golden Gate</span></button>
+  </div>
+  <p class="small">Full-sim flight model from the 1980 AFWAL F-14A wind-tunnel data. Fly on-speed (15 units), don't flare, military power at touchdown.</p>
+</div>
 <div id="stamp"></div>
 <script type="module" src="src/main.js"></script>
 </body>

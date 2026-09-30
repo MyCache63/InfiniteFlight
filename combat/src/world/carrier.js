@@ -138,7 +138,7 @@ export class Carrier {
         const prev = this.prevHookS ?? lc.s;
         if (prev < wire.s && lc.s >= wire.s && Math.abs(lc.lat) < 16 && this.hookInfo.hDeck < 0.12) {
           this.trap = { wire: wire.i, s0: lc.s, v0: vAlong, t: 0, stopped: false, sink: ac.lastTouchSink };
-          this.lso.onTrap(wire.i, ac);
+          this.lso.onTrap(wire.i, ac); this.onEvent?.('trap');
           break;
         }
       }
@@ -194,7 +194,7 @@ export class Carrier {
       // Holdback keeps the jet in place; shuttle holds it on the track.
       ac.extForce = [-fwd[0] * (ac.engL.thrust(ac.air.sigma, 0, 1) + ac.engR.thrust(ac.air.sigma, 0, 1)) - rel * ac.mass * fwd[0] * 3, -fwd[1] * (ac.engL.thrust(ac.air.sigma, 0, 1) + ac.engR.thrust(ac.air.sigma, 0, 1)) - rel * ac.mass * fwd[1] * 3, 0];
       if (ac.ctl.throttle >= 0.79) c.timer += dt; else c.timer = 0;
-      if (c.timer > 2.0) { c.state = 'stroke'; c.xs = L.x; this.lso.say('Shooter salute, launch.'); }
+      if (c.timer > 2.0) { c.state = 'stroke'; c.xs = L.x; this.lso.say('Shooter salute, launch.'); this.onEvent?.('cat'); }
       return;
     }
     if (c.state === 'stroke') {
@@ -212,8 +212,8 @@ export class Carrier {
   build() {
     const g = this.group;
     this.shipRoot = new THREE.Group(); g.add(this.shipRoot);   // x fwd, y up, z port? built in three local, see placeMeshes
-    const hullMat = new THREE.MeshStandardMaterial({ color: 0x5f666d, roughness: 0.75, metalness: 0.2 });
-    const deckMat = new THREE.MeshStandardMaterial({ map: this.deckTexture(), roughness: 0.92, metalness: 0.05 });
+    const hullMat = new THREE.MeshStandardMaterial({ color: 0x5f666d, roughness: 0.75, metalness: 0.2, side: THREE.DoubleSide });
+    const deckMat = new THREE.MeshStandardMaterial({ map: this.deckTexture(), roughness: 0.92, metalness: 0.05, side: THREE.DoubleSide });
     // Hull: lofted from waterline sections (local three frame: x fwd, y up, z = -starboard).
     const shape = new THREE.Shape();
     // Shape in (x fwd, -y) so that after the -90 deg x rotation ship starboard maps to local +z.
