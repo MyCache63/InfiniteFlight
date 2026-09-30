@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InfiniteFlight Combat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0a1016; }
+  canvas { display: block; }
+  #stamp { position: fixed; right: 10px; bottom: 8px; z-index: 6; font: 11px "IBM Plex Mono", Menlo, monospace; color: rgba(200,230,210,0.75); pointer-events: none; }
+  #help { position: fixed; left: 12px; top: 10px; z-index: 6; font: 12px/1.5 "IBM Plex Mono", Menlo, monospace; color: rgba(210,235,220,0.8); background: rgba(8,16,14,0.45); padding: 8px 10px; border-radius: 3px; pointer-events: none; }
+  body.hideui #help, body.hideui #stamp { display: none; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="help">Arrows pitch/roll · Q/E rudder · W/S throttle (past 80% = afterburner) · [ ] trim<br>G gear · F flaps · H hook · B speed brake · Space brakes · V view · T time · R restart · P pause</div>
+<div id="stamp"></div>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

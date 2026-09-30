@@ -1,0 +1,6 @@
+[
+ {"name": "m1_side", "place": {"lat": 37.70, "lon": -122.95, "altFt": 3000, "kt": 300, "hdg": 90}, "view": "orbit", "cam": {"yaw": 1.5708, "pitch": 0.0, "dist": 30}, "advance": 0.1, "wait": 3, "hideui": true, "setup": "IFC.camera.fov=20"},
+ {"name": "m2_top", "place": {"lat": 37.70, "lon": -122.95, "altFt": 3000, "kt": 300, "hdg": 90}, "view": "orbit", "cam": {"yaw": 0.0, "pitch": -1.5, "dist": 34}, "advance": 0.1, "wait": 3, "hideui": true},
+ {"name": "m3_front34", "place": {"lat": 37.70, "lon": -122.95, "altFt": 3000, "kt": 300, "hdg": 90}, "view": "orbit", "cam": {"yaw": 2.5, "pitch": -0.25, "dist": 24}, "advance": 0.1, "wait": 3, "hideui": true},
+ {"name": "m4_rear34_swept", "place": {"lat": 37.70, "lon": -122.95, "altFt": 20000, "kt": 560, "hdg": 90}, "view": "orbit", "cam": {"yaw": 0.6, "pitch": -0.35, "dist": 26}, "advance": 6, "wait": 3, "hideui": true}
+]

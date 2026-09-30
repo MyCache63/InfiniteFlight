@@ -53,7 +53,7 @@ export const GEAR = [
 const HARD = [[9.5, 0, 0.6], [-9.0, 0, -0.2], [-7.5, 0, 0.9], [2.0, 0, 1.1], [-2.0, -9.6, 0.4], [-2.0, 9.6, 0.4],
   [-8.3, -2.6, -2.9], [-8.3, 2.6, -2.9]];
 export const HOOK_POINT = [-7.9, 0, 1.55]; // tailhook tip when down (EST)
-export const EYE_POINT = [5.2, 0, -0.95];  // pilot eye (EST)
+export const EYE_POINT = [5.2, 0, -1.15];  // pilot eye (EST)
 
 const EMPTY_KG = 44531 * LBM; // TM-81833 operating empty weight
 export const FUEL_MAX_KG = 16200 * LBM; // F-14A internal fuel (published)

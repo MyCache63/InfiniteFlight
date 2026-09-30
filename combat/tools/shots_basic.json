@@ -1,0 +1,7 @@
+[
+  {"name": "01_chase_goldengate", "place": {"lat": 37.80, "lon": -122.56, "altFt": 2500, "kt": 350, "hdg": 80}, "view": "chase", "cam": {"yaw": 0.5, "pitch": -0.12, "dist": 34}, "advance": 0.5},
+  {"name": "02_cockpit_bay", "place": {"lat": 37.80, "lon": -122.60, "altFt": 3500, "kt": 350, "hdg": 85}, "view": "cockpit", "advance": 0.5},
+  {"name": "03_side_closeup", "place": {"lat": 37.70, "lon": -122.80, "altFt": 3000, "kt": 300, "hdg": 90}, "view": "orbit", "cam": {"yaw": 1.57, "pitch": -0.05, "dist": 26}, "advance": 0.3},
+  {"name": "04_top_sweep", "place": {"lat": 37.70, "lon": -122.80, "altFt": 3000, "kt": 300, "hdg": 90}, "view": "orbit", "cam": {"yaw": 0.3, "pitch": -1.2, "dist": 30}, "advance": 0.3},
+  {"name": "05_sierra_high", "place": {"lat": 37.74, "lon": -119.75, "altFt": 14000, "kt": 420, "hdg": 95}, "view": "chase", "cam": {"yaw": 0.2, "pitch": -0.1, "dist": 36}, "advance": 0.5}
+]
