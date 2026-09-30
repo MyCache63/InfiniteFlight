@@ -46,7 +46,7 @@ httpd = socketserver.TCPServer(('127.0.0.1', 8473), functools.partial(Quiet, dir
 threading.Thread(target=httpd.serve_forever, daemon=True).start()
 
 with sync_playwright() as p:
-    b = p.chromium.launch(headless=False, args=['--use-angle=metal', '--ignore-gpu-blocklist'])
+    b = p.chromium.launch(headless=True, args=['--headless=new', '--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'])
     pg = b.new_page(viewport={'width': 1400, 'height': 800})
     logs = []
     pg.on('console', lambda m: logs.append(m.type + ': ' + m.text[:400]) if m.type in ('error', 'warning') else None)

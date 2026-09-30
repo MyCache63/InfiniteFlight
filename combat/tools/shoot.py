@@ -19,9 +19,8 @@ socketserver.TCPServer.allow_reuse_address = True
 httpd = socketserver.TCPServer(('127.0.0.1', 8472), functools.partial(Quiet, directory=ROOT))
 threading.Thread(target=httpd.serve_forever, daemon=True).start()
 
-args = ['--use-angle=metal', '--ignore-gpu-blocklist', '--enable-gpu-rasterization']
 with sync_playwright() as p:
-    b = p.chromium.launch(headless=headless, args=args)
+    b = p.chromium.launch(headless=True, args=['--headless=new', '--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'])
     pg = b.new_page(viewport={'width': 1440, 'height': 810})
     logs = []
     pg.on('console', lambda m: logs.append(m.type + ': ' + m.text[:400]) if m.type in ('error', 'warning') else None)
