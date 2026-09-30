@@ -1,5 +1,14 @@
 # InfiniteFlight Handover - September 30, 2026
 
+## Update 2026-09-30 afternoon: combat mode built (combat/ folder)
+- **Run it:** `./start_infiniteflight.sh`, then open http://localhost:8471/combat/ (menu: 1 groove, 2 catapult, 3 Case I break, 0 free flight).
+- **Flight model:** `combat/src/fdm/` holds the AFWAL-TR-80-3141 F-14A tables (hand-transcribed, symmetry-checked, 3 faint cells filled and marked), estimated sweep/Mach/flap terms, TF30 engines, a 6-DOF RK4 core, and a trim solver. `node combat/tests/validate_f14.mjs` gives 9/9 checks against published numbers (approach speed, stall, Mach 1.28 at sea level, Mach 2.27 at 40,000 ft, 186 deg/s roll, 7.6 g).
+- **Carrier:** `combat/src/world/carrier.js` has the moving deck, 4 wires, Mk 7 constant-runout arrestment, catapult, IFLOLS lens, LSO calls and grades. An automated test pilot traps on 12 of 12 passes at 575-740 fpm sink, and grades range from _OK_ to Cut.
+- **World:** streaming real terrain (AWS Terrarium elevation + USGS imagery), FFT-spectrum ocean, sky, sound.
+- **Tools:** `combat/tools/shoot.py <shots.json> <outdir>` takes GPU screenshots; review rounds go in `combat/review/` (gitignored).
+- **In progress:** a separate agent is rebuilding the F-14 3D model in a worktree; an outside-reviewer agent is critiquing screenshots.
+- **Open:** the joystick flight test is still owed; the joystick calibration from the old sim is read automatically (same origin).
+
 ## Update 2026-09-30: combat direction chosen
 - Michael asked about Unreal Engine.  We're staying on Three.js because the sim must run in browsers on AIQuorum (review: `InfiniteFlight_UnrealEngineReview_v01_2026-09-30.html`).
 - The project is now a modern JetFighter-style combat sim.  Design: `InfiniteFlight_CombatDesign_v02_2026-09-30.html` (https://claude.ai/artifact/LuJ2BDxwFC3CqfDH5A2Qfp).  Plan and Michael's answers: `InfiniteFlightCombatPlan_v01.0.0_Sep30.md`.

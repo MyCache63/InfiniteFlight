@@ -239,7 +239,7 @@ paused = true;
 window.IFC = {
   ac, env, terrain, camera, scene, renderer, model, input,
   setView(v) { viewMode = v; },
-  setFreeze(f) { freeze = f; },
+  setFreeze(f) { freeze = f; paused = false; },
   advance(sec) { const n = Math.round(sec / DT); for (let i = 0; i < n; i++) { carrier.update(DT, ac); ac.step(DT, simEnv); t += DT; } },
   carrier, startGroove, startCat, startBreak,
   setAuto(v) { autoApproach = v; },

@@ -233,6 +233,7 @@ export class Carrier {
     slab.rotation.x = -Math.PI / 2; slab.position.y = DECK_H - 1.21; this.shipRoot.add(slab);
     const hull = this.hullGeometry();
     this.shipRoot.add(new THREE.Mesh(hull, hullMat));
+    this.buildDetails(hullMat);
     // Island (starboard, amidships-aft) with mast and radars.
     const isl = new THREE.Group(); this.shipRoot.add(isl);
     const box = (w, h, d, x, y, z, m = hullMat) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); b.position.set(x, y, z); isl.add(b); return b; };
@@ -240,7 +241,7 @@ export class Carrier {
     box(26, 7, 9.5, 20, DECK_H + 12.5, 31);
     box(18, 5.5, 8, 22, DECK_H + 18.7, 31);
     const glass = new THREE.MeshStandardMaterial({ color: 0x1a2630, roughness: 0.1, metalness: 0.6 });
-    box(18.2, 1.2, 8.2, 22, DECK_H + 20.2, 31, glass);
+    box(18.2, 1.4, 8.2, 22, DECK_H + 20.2, 31, glass); box(26.2, 1.0, 9.7, 20, DECK_H + 14.2, 31, glass);
     box(1.2, 16, 1.2, 16, DECK_H + 29, 31);
     box(7, 0.4, 0.4, 16, DECK_H + 33, 31);
     const radar = box(0.3, 3, 6, 18, DECK_H + 36, 31); this.radar = radar;
@@ -269,36 +270,89 @@ export class Carrier {
     this.group.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   }
 
+  // Hull lofted from the flight-deck outline down to a narrower waterline hull and the keel, so the flight deck
+  // overhangs on sponsons like the real ship. Three rings: deck edge (z 17.1), hangar deck line (z 10, over the
+  // waterline hull), keel (z -11.3). EST proportions: waterline beam 40.8 m, draft 11.3 m (published).
   hullGeometry() {
-    // Hull sections: from keel to deck, beam 40.8 m at the waterline, flaring to the deck overhangs.
-    const secs = [];
-    for (let i = 0; i <= 24; i++) {
-      const x = -158 + i * (320 / 24);
-      const f = (x + 158) / 320;
-      const bow = Math.max(0, (f - 0.72) / 0.28);
-      const beam = 20.4 * (1 - bow * bow * 0.95) * (f < 0.04 ? 0.8 + 5 * f : 1);
-      secs.push({ x, beam, keel: -11.3 * (1 - bow * 0.6) });
+    const M = 260, per = [];
+    const P = DECK_POLY.concat([DECK_POLY[0]]);
+    const segLen = []; let total = 0;
+    for (let i = 0; i < P.length - 1; i++) { const l = Math.hypot(P[i + 1][0] - P[i][0], P[i + 1][1] - P[i][1]); segLen.push(l); total += l; }
+    for (let k = 0; k < M; k++) {
+      let d = k / M * total, i = 0;
+      while (d > segLen[i]) { d -= segLen[i]; i++; }
+      const t = d / segLen[i];
+      per.push([P[i][0] + (P[i + 1][0] - P[i][0]) * t, P[i][1] + (P[i + 1][1] - P[i][1]) * t]);
     }
+    const bw = (x) => { // waterline half-beam
+      if (x > 95) return 20.4 * Math.max(0.02, 1 - Math.pow((x - 95) / 68, 1.6));
+      if (x < -150) return 18.5;
+      return 20.4;
+    };
+    const rings = [];
+    // Ring 0: deck edge, just under the deck slab.
+    rings.push(per.map(([x, y]) => [x, y, DECK_H - 1.2]));
+    // Ring 1: top of the sponson flare; ring 2: hangar-deck line over the waterline hull.
+    rings.push(per.map(([x, y]) => { const xw = Math.max(-160, Math.min(163, x)); const b = bw(xw); const yy = Math.sign(y || 1) * Math.min(Math.abs(y), b + (Math.abs(y) - b) * 0.25); return [x * 0.998, yy, DECK_H - 4.2]; }));
+    rings.push(per.map(([x, y]) => { const xw = Math.max(-158, Math.min(162, x)); return [xw, Math.sign(y || 1) * Math.min(Math.abs(y), bw(xw)), 10]; }));
+    rings.push(per.map(([x, y]) => { const xw = Math.max(-158, Math.min(162, x)); return [xw, Math.sign(y || 1) * Math.min(Math.abs(y), bw(xw)), 0]; }));
+    rings.push(per.map(([x, y]) => { const xw = Math.max(-150, Math.min(150, x)); const bow = Math.max(0, (xw - 100) / 50); return [xw, Math.sign(y || 1) * Math.min(Math.abs(y), bw(xw)) * 0.75, -11.3 + bow * 6]; }));
     const pos = [], idx = [];
-    const ring = 12;
-    for (const s of secs) {
-      for (let k = 0; k <= ring; k++) {
-        const t = k / ring; // 0 = port deck edge, 0.5 = keel, 1 = starboard deck edge
-        const a = (t - 0.5) * Math.PI;
-        const yz = Math.sin(a), yv = -Math.cos(a);
-        const h = yv < 0 ? s.keel * -yv : 0;
-        const y = yv < 0 ? h : 0;
-        const z = yz * s.beam * (0.85 + 0.15 * Math.abs(yz));
-        pos.push(s.x, t === 0 || t === 1 ? DECK_H - 1.2 : y + (Math.abs(yz) > 0.95 ? (DECK_H - 1.2) * (Math.abs(yz) - 0.95) / 0.05 : 0), z);
-      }
-    }
-    for (let i = 0; i < secs.length - 1; i++) for (let k = 0; k < ring; k++) {
-      const a = i * (ring + 1) + k, b = a + 1, c = a + ring + 1, d = c + 1;
+    for (const r of rings) for (const [x, y, z] of r) pos.push(x, z, y); // ship-local three: x fwd, y up, z stbd
+    for (let r = 0; r < rings.length - 1; r++) for (let k = 0; k < M; k++) {
+      const a = r * M + k, b = r * M + (k + 1) % M, c = a + M, d = b + M;
       idx.push(a, c, b, b, c, d);
     }
+    // Close the bottom.
+    const base = pos.length / 3; pos.push(0, -11.3, 0);
+    for (let k = 0; k < M; k++) idx.push(base, (rings.length - 1) * M + k, (rings.length - 1) * M + (k + 1) % M);
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
     return g;
+  }
+
+  // Deck-edge elevators, hangar openings, catwalks, LSO platform, island detail and parked jets.
+  buildDetails(hullMat) {
+    const R = this.shipRoot, dark = new THREE.MeshStandardMaterial({ color: 0x1b1e21, roughness: 0.9 });
+    const deckGray = new THREE.MeshStandardMaterial({ color: 0x4a4e52, roughness: 0.9 });
+    const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); R.add(m); return m; };
+    // Elevators (starboard: two forward of the island, one aft; port: one aft on the angled deck edge).
+    for (const [x0, x1, side] of [[44, 62, 1], [66, 84, 1], [-40, -22, 1], [-112, -94, -1]]) {
+      const w = x1 - x0, zc = side > 0 ? 37 + 7.5 : -39 - 7.5;
+      add(new THREE.BoxGeometry(w, 0.9, 15), deckGray, (x0 + x1) / 2, DECK_H - 0.45, zc);
+      add(new THREE.BoxGeometry(w + 2, 7, 0.3), dark, (x0 + x1) / 2, DECK_H - 6.5, side * (side > 0 ? 36.2 : 38.2));
+    }
+    // Hangar-bay openings behind the elevators (dark).
+    // Catwalk ledges around the deck edge.
+    const ledge = new THREE.MeshStandardMaterial({ color: 0x3a3e42, roughness: 0.9 });
+    for (const [x0, x1, y] of [[-150, 40, 37.5], [-100, 40, -39.8]]) add(new THREE.BoxGeometry(x1 - x0, 0.25, 2.2), ledge, (x0 + x1) / 2, DECK_H - 1.6, y + Math.sign(y) * 1.1);
+    // LSO platform, port side aft, next to the landing area.
+    const lp = this.landingPoint(30, -26);
+    add(new THREE.BoxGeometry(10, 0.3, 5), ledge, lp[0], DECK_H - 0.3, lp[1]);
+    // Island detail: bridge window band, hull number, SPS-48 style radar and mast yardarms.
+    const white = new THREE.MeshBasicMaterial({ color: 0xe8e6dc });
+    const numC = document.createElement('canvas'); numC.width = 256; numC.height = 256; const nx = numC.getContext('2d');
+    nx.fillStyle = '#e8e6dc'; nx.font = 'bold 200px Arial'; nx.textAlign = 'center'; nx.textBaseline = 'middle'; nx.fillText('70', 128, 138);
+    const numT = new THREE.CanvasTexture(numC); numT.colorSpace = THREE.SRGBColorSpace;
+    const num = add(new THREE.PlaneGeometry(7, 7), new THREE.MeshBasicMaterial({ map: numT, transparent: true }), 14, DECK_H + 13.5, 26.1);
+    num.rotation.y = Math.PI;
+    const ant = add(new THREE.BoxGeometry(0.4, 5, 7), hullMat, 20, DECK_H + 41, 31); this.radar2 = ant;
+    for (const yy of [DECK_H + 34, DECK_H + 38]) add(new THREE.BoxGeometry(0.3, 0.3, 9), hullMat, 16, yy, 31);
+    void white;
+    // Parked aircraft: simple low-poly jets with wings folded or oversept, for scale.
+    const jetMat = new THREE.MeshStandardMaterial({ color: 0x8a9096, roughness: 0.6, metalness: 0.2 });
+    const jet = () => {
+      const g = new THREE.Group();
+      const f = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 17, 10), jetMat); f.rotation.z = Math.PI / 2; f.position.y = 1.6; g.add(f);
+      const nose = new THREE.Mesh(new THREE.ConeGeometry(0.7, 2.6, 10), jetMat); nose.rotation.z = -Math.PI / 2; nose.position.set(9.8, 1.6, 0); g.add(nose);
+      const w = new THREE.Mesh(new THREE.BoxGeometry(6.5, 0.18, 10.5), jetMat); w.position.set(-1.2, 1.7, 0); g.add(w);
+      for (const sz of [-1, 1]) { const t = new THREE.Mesh(new THREE.BoxGeometry(2.8, 3.0, 0.15), jetMat); t.position.set(-6.8, 3.2, sz * 1.5); t.rotation.x = sz * 0.1; g.add(t); }
+      const can = new THREE.Mesh(new THREE.SphereGeometry(0.7, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x223040, roughness: 0.1, metalness: 0.5 }));
+      can.scale.set(3, 0.9, 1); can.position.set(4.5, 2.2, 0); g.add(can);
+      return g;
+    };
+    const spots = [[120, 30, -2.6], [104, 30, -2.6], [88, 30, -2.6], [-5, 30, -2.4], [-20, 30, -2.4], [100, -16, 0.5], [130, -8, 0.3]];
+    for (const [x, y, rot] of spots) { const j = jet(); j.position.set(x, DECK_H, y); j.rotation.y = rot; R.add(j); }
   }
 
   deckTexture() {
@@ -398,7 +452,7 @@ export class Carrier {
     void e;
     this.wake.position.set(this.shipRoot.position.x, 0, this.shipRoot.position.z);
     this.wake.rotation.set(0, Math.PI / 2 - this.heading, 0);
-    this.radar.rotation.y = this.t * 2.5;
+    this.radar.rotation.y = this.t * 2.5; if (this.radar2) this.radar2.rotation.y = -this.t * 1.6;
   }
 
   updateLens(ac) {
